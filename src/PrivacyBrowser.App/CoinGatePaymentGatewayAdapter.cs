@@ -8,6 +8,50 @@ public sealed class CoinGatePaymentGatewayAdapter : IPaymentGatewayAdapter
     private const string PaymentUrlField = "paymentUrl";
 
     public string GatewayName => CanonicalGatewayName;
+    public string DisplayName => "CoinGate (crypto)";
+    public string OptionsCurrency => "MYST";
+    public string AmountCurrency => "MYST";
+
+    public decimal EffectiveMinimum(PaymentGateway gateway) => gateway.OrderOptions.Minimum;
+
+    public IReadOnlyList<decimal> SuggestedAmounts(PaymentGateway gateway) => (gateway.OrderOptions.Suggested ?? [])
+        .Where(value => value > EffectiveMinimum(gateway))
+        .OrderBy(value => value)
+        .Distinct()
+        .ToArray();
+
+    public string ParseAndFormatAmount(string value) => PaymentAmount.ParseAndFormatMyst(value);
+
+    // Preserve the existing CoinGate contract: its reported MYST minimum is exclusive.
+    public bool IsAmountAllowed(decimal amount, PaymentGateway gateway) =>
+        amount > 0m && (EffectiveMinimum(gateway) <= 0m || amount > EffectiveMinimum(gateway));
+
+    public PaymentOrderCreateRequest BuildRequest(
+        string requestedAmount,
+        string payCurrency,
+        string country,
+        string state) => new()
+    {
+        MystAmount = requestedAmount,
+        PayCurrency = payCurrency,
+        Country = country,
+        State = state,
+        ProjectId = null,
+        GatewayCallerData = new Dictionary<string, object>(),
+    };
+
+    public void ValidateOrder(PaymentOrder order, PaymentOrderIntent intent)
+    {
+        PaymentOrderValidator.ValidateCommon(order, intent);
+        if (!string.Equals(order.PayCurrency, intent.PayCurrency, StringComparison.Ordinal) ||
+            !PaymentAmount.TryParseResponseAmount(order.ReceiveMyst, out var received) ||
+            !PaymentAmount.TryParseResponseAmount(intent.RequestedAmount, out var requested) ||
+            received != requested ||
+            !PaymentAmount.TryParseResponseAmount(order.PayAmount, out _))
+        {
+            throw new InvalidOperationException("The CoinGate order did not match the requested payment intent.");
+        }
+    }
 
     public PaymentTarget ParsePaymentTarget(JsonElement publicGatewayData)
     {

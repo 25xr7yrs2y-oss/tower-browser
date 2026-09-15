@@ -2,6 +2,21 @@
 
 ## Current status
 
+### Version 1.0.8 payment validation scope
+
+The 1.0.8 automated suite validates the Mysterium-hosted Stripe/PayPal client
+contracts with deterministic fake TequilAPI responses and static native-UI
+invariants. Read-only production discovery on 2026-09-15 reported exact
+`stripe` and `paypal` gateways with USD currency and a 0.50 live minimum, so
+the application floor makes 1.00 USD the effective minimum and lowest preset.
+
+No live order was created. No real or unpaid transaction, hosted checkout
+session, card submission, PayPal login, 3-D Secure step, or MYST wallet-credit
+test was performed. Production payment success therefore remains unvalidated;
+the exact Mysterium PayPal checkout URL contract is deliberately still a live
+runtime validation item and will fail closed unless it matches the documented
+exact `https://www.paypal.com/checkoutnow` initial contract.
+
 > The packet captures below predate the native UI migration. They remain
 > evidence for the unchanged browser policy and 4449 data plane, but they do
 > not constitute network validation of the native application. Version 1.0.1

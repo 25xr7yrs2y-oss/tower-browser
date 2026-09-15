@@ -32,6 +32,21 @@ a packet capture, process/port mapping, result, and retained evidence file.
 | S6 | Close browser and backend; reboot comparison | Routes, DNS, adapters, global proxy unchanged | Persistent system networking change |
 | S7 | Standard-user launch | Full operation without elevation | Elevation required or privileged system mutation |
 
+## Hosted payment validation boundary
+
+Automated 1.0.8 validation must exercise discovery intersection, amount and
+request serialization, hostile checkout URL inputs, response-intent matching,
+ambiguous POST reconciliation, one-active-order enforcement, journal restart,
+status mapping, and independent balance evidence with local fake responses.
+Read-only production gateway discovery is permitted.
+
+It must not create a Stripe, PayPal, or CoinGate order or submit card, PayPal,
+bank, or 3-D Secure credentials. A later explicitly authorized live validation
+must separately confirm Mysterium's actual top-level `checkout_url`, the exact
+initial PayPal production host/path, provider redirects, status transitions,
+and wallet credit. Compilation, mocks, metadata discovery, and opening an URL
+cannot establish production payment success.
+
 ## Capture procedure
 
 Run `validation/Invoke-Validation.ps1` from an elevated PowerShell prompt. For
@@ -43,4 +58,3 @@ capture when separate captures are practical.
 For S2-S5, record the browser PID tree and filter the socket snapshots by those
 PIDs. Packet captures alone do not carry Windows PID metadata; the time-aligned
 socket snapshots are therefore mandatory attribution evidence.
-

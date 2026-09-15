@@ -15,6 +15,12 @@
     <Compile Include="../../src/PrivacyBrowser.App/PaymentTarget.cs" Link="PaymentTarget.cs" />
     <Compile Include="../../src/PrivacyBrowser.App/PaymentUriValidator.cs" Link="PaymentUriValidator.cs" />
     <Compile Include="../../src/PrivacyBrowser.App/CoinGatePaymentGatewayAdapter.cs" Link="CoinGatePaymentGatewayAdapter.cs" />
+    <Compile Include="../../src/PrivacyBrowser.App/HostedCheckoutPaymentGatewayAdapter.cs" Link="HostedCheckoutPaymentGatewayAdapter.cs" />
+    <Compile Include="../../src/PrivacyBrowser.App/StripePaymentGatewayAdapter.cs" Link="StripePaymentGatewayAdapter.cs" />
+    <Compile Include="../../src/PrivacyBrowser.App/PayPalPaymentGatewayAdapter.cs" Link="PayPalPaymentGatewayAdapter.cs" />
+    <Compile Include="../../src/PrivacyBrowser.App/PaymentContracts.cs" Link="PaymentContracts.cs" />
+    <Compile Include="../../src/PrivacyBrowser.App/PaymentJournalStore.cs" Link="PaymentJournalStore.cs" />
+    <Compile Include="../../src/PrivacyBrowser.App/PaymentOrderValidator.cs" Link="PaymentOrderValidator.cs" />
     <Compile Include="../../src/PrivacyBrowser.App/TcpListenerInspector.cs" Link="TcpListenerInspector.cs" />
   </ItemGroup>
 </Project>

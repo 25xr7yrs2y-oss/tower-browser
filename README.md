@@ -1,16 +1,16 @@
 # Privacy Browser
 
-Version 1.0.7 is a Windows x64 testing release combining a native .NET/WPF control application,
+Version 1.0.8 is a Windows x64 testing release combining a native .NET/WPF control application,
 an unpacked Mullvad Browser, and the `custom-proxy-build` Myst node from
 `myst-lmprove`. It does not modify the Windows system proxy, DNS servers,
 firewall, or route table.
 
 ## Status
 
-The native integration and portable release packaging are implemented. Version 1.0.7 keeps the explicit per-operation
+The native integration and portable release packaging are implemented. Version 1.0.8 keeps the explicit per-operation
 deadlines and safe reconciliation introduced in 1.0.5, fixes proxy-mode route/supervisor isolation in the pinned backend,
-consistently addresses the app-owned proxy connection as ID 4449 for status and disconnect operations, and replaces
-single-gateway payment parsing with a fail-closed adapter registry. The payment-target, navigation, identity, readiness,
+consistently addresses the app-owned proxy connection as ID 4449 for status and disconnect operations, and adds
+Mysterium-hosted Stripe card and PayPal top-ups to the fail-closed adapter registry. The payment-target, navigation, identity, readiness,
 browser-process, and bundle-integrity hardening
 from earlier versions remains in place. Packet capture confirms browser payload
 routing through the loopback backend and a Mysterium provider, no direct
@@ -84,7 +84,7 @@ This publishes the WPF app to `app\PrivacyBrowser.exe`. Use
 `-SelfContained` if the target machine does not have the .NET 8 Desktop Runtime.
 
 The executable embeds the official multi-resolution Windows icon and reports
-file/product version `1.0.7`. The native WPF window uses the matching embedded
+file/product version `1.0.8`. The native WPF window uses the matching embedded
 PNG resource so Windows Imaging Component can decode it reliably at startup.
 
 ## Release package
@@ -97,7 +97,7 @@ $env:MYST_RELEASE_TOKEN = "<token with read access to the pinned backend release
 .\tests\Test-ReleasePackage.ps1
 ```
 
-This creates `PrivacyBrowser-1.0.7-windows-x64-portable.zip`, its SHA-256
+This creates `PrivacyBrowser-1.0.8-windows-x64-portable.zip`, its SHA-256
 manifest, and the corresponding `myst-lmprove` source archive. The upstream
 installers are downloaded at pinned hashes and extracted; they are never run.
 
@@ -125,7 +125,8 @@ identity, wallet, provider, and browser-readiness state at a glance. Use the
 - explicitly select among identities and retry unlock credentials securely;
 - view and refresh the identity's MYST balance;
 - create a top-up through the intersection of gateways reported by Myst and
-  explicitly registered client adapters (CoinGate only in 1.0.7);
+  explicitly registered client adapters: CoinGate, credit/debit card (Stripe),
+  and PayPal;
 - discover, search, inspect, and select WireGuard providers;
 - connect, disconnect, and launch the isolated browser;
 - restart an owned backend after failure; and
@@ -157,7 +158,9 @@ an unrelated policy file. The policy affects only this browser tree.
 .\tests\Test-NativeArchitecture.ps1
 .\tests\Test-NavigationArchitecture.ps1
 .\tests\Test-BackendControls.ps1
+.\tests\Test-PaymentSecurity.ps1
 dotnet run --project .\tests\PrivacyBrowser.BackendController.Tests\PrivacyBrowser.BackendController.Tests.csproj --configuration Release
+dotnet run --project .\tests\PrivacyBrowser.PaymentLifecycle.Tests\PrivacyBrowser.PaymentLifecycle.Tests.csproj --configuration Release
 .\tests\Test-ProductHardening.ps1
 .\tests\Test-ReleaseMetadata.ps1
 .\tests\Test-Evidence.ps1
@@ -174,6 +177,14 @@ Read `docs/VALIDATION_PLAN.md` before interpreting the result.
   bridges, pluggable transports, or Tor's anonymity properties.
 - The backend's direct discovery, identity, payment, monitoring, and provider
   negotiation traffic is allowed control-plane traffic.
+- Stripe and PayPal orders remain Mysterium/Pilvytis orders. The app has no
+  merchant keys, Stripe/PayPal SDK, or card/PayPal credential entry surface.
+  USD order options and requests have an application floor of $1.00, with a
+  higher live gateway minimum taking precedence.
+- Hosted checkout URLs stay in native memory, are never logged/persisted/copied,
+  and open only in the default browser after exact field, HTTPS, port, fragment,
+  user-info, and production-host validation. PayPal is further restricted to
+  the documented `/checkoutnow` production path.
 - The Mysterium provider must be selected and connected before browsing.
 - The launcher rejects non-loopback proxy settings and unexpected owners of
   port 4449.
