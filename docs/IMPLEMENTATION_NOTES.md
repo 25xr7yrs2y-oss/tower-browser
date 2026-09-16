@@ -128,7 +128,7 @@ proxyclient path, but the installer is not acceptable for a browser-scoped
 package as-is. The test installation was uninstalled and the service was
 verified absent.
 
-Version 1.0.8 continues the 1.0.6 packaging change and does not extract the backend from that installer. Packaging
+Version 1.0.9 continues the 1.0.6 packaging change and does not extract the backend from that installer. Packaging
 pins the trusted workflow's raw `myst-windows-x64.exe` release asset and verifies
 its SHA-256 before copying it into the portable bundle; no supervisor executable
 or installer is included or executed.

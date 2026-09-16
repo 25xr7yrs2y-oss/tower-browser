@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - "v*"
+      - "v1.0.9"
 
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - name: Upload verified release assets
         uses: actions/upload-artifact@v4
         with:
-          name: PrivacyBrowser-1.0.8-release-assets
+          name: PrivacyBrowser-1.0.9-release-assets
           path: release/*
           if-no-files-found: error
           compression-level: 0

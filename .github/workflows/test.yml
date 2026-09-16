@@ -77,12 +77,12 @@ jobs:
       - name: Upload native application
         uses: actions/upload-artifact@v4
         with:
-          name: PrivacyBrowser-1.0.8-windows-x64-app
+          name: PrivacyBrowser-1.0.9-windows-x64-app
           path: app/
           if-no-files-found: error
       - name: Upload self-contained QA application
         uses: actions/upload-artifact@v4
         with:
-          name: PrivacyBrowser-1.0.8-windows-x64-self-contained
+          name: PrivacyBrowser-1.0.9-windows-x64-self-contained
           path: qa-app/
           if-no-files-found: error

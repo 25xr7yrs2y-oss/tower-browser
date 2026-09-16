@@ -34,7 +34,7 @@ a packet capture, process/port mapping, result, and retained evidence file.
 
 ## Hosted payment validation boundary
 
-Automated 1.0.8 validation must exercise discovery intersection, amount and
+Automated 1.0.9 validation must exercise discovery intersection, amount and
 request serialization, hostile checkout URL inputs, response-intent matching,
 ambiguous POST reconciliation, one-active-order enforcement, journal restart,
 status mapping, and independent balance evidence with local fake responses.

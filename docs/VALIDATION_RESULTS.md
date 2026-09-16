@@ -2,11 +2,14 @@
 
 ## Current status
 
-### Version 1.0.8 payment validation scope
+### Version 1.0.9 validation scope
 
-The 1.0.8 automated suite validates the Mysterium-hosted Stripe/PayPal client
-contracts with deterministic fake TequilAPI responses and static native-UI
-invariants. Read-only production discovery on 2026-09-15 reported exact
+The 1.0.9 automated suite retains the 1.0.8 Mysterium-hosted Stripe/PayPal client
+contract validation with deterministic fake TequilAPI responses and static native-UI
+invariants. It also validates fixed hashes for the supplied icon artwork and its
+derived WPF/Windows assets, WIC decoding of every ICO frame, and comparison of
+the built executable's extracted PE icon with the approved 32 px artwork.
+Read-only production discovery on 2026-09-15 reported exact
 `stripe` and `paypal` gateways with USD currency and a 0.50 live minimum, so
 the application floor makes 1.00 USD the effective minimum and lowest preset.
 

@@ -2,7 +2,7 @@
 param([string]$ReleaseDirectory = (Join-Path (Split-Path $PSScriptRoot -Parent) "release"))
 
 $ErrorActionPreference = "Stop"
-$version = "1.0.8"
+$version = "1.0.9"
 $base = "PrivacyBrowser-$version-windows-x64-portable"
 $zip = Join-Path $ReleaseDirectory "$base.zip"
 $source = Join-Path $ReleaseDirectory "PrivacyBrowser-$version-myst-lmprove-source-7944a4c.tar.gz"
@@ -64,13 +64,38 @@ try {
         throw "Portable package must not contain or execute the upstream service-installing backend installer."
     }
     $info = (Get-Item -LiteralPath $exe).VersionInfo
-    if ($info.FileVersion -ne "1.0.8.0" -or -not $info.ProductVersion.StartsWith("1.0.8")) {
+    if ($info.FileVersion -ne "1.0.9.0" -or -not $info.ProductVersion.StartsWith("1.0.9")) {
         throw "Packaged executable version metadata is incorrect."
     }
     Add-Type -AssemblyName System.Drawing
     $icon = [Drawing.Icon]::ExtractAssociatedIcon($exe)
     if (-not $icon) { throw "Packaged executable has no extractable application icon." }
-    $icon.Dispose()
+    $embeddedBitmap = $icon.ToBitmap()
+    $expectedBitmap = [Drawing.Bitmap]::FromFile((Join-Path (Split-Path $PSScriptRoot -Parent) "src\PrivacyBrowser.App\Assets\Icons\app-icon-32.png"))
+    try {
+        $comparison = New-Object Drawing.Bitmap 32, 32
+        $graphics = [Drawing.Graphics]::FromImage($comparison)
+        try { $graphics.DrawImage($embeddedBitmap, 0, 0, 32, 32) } finally { $graphics.Dispose() }
+        $difference = 0L
+        for ($y = 0; $y -lt 32; $y++) {
+            for ($x = 0; $x -lt 32; $x++) {
+                $a = $comparison.GetPixel($x, $y)
+                $b = $expectedBitmap.GetPixel($x, $y)
+                $difference += [Math]::Abs([int]$a.R - [int]$b.R)
+                $difference += [Math]::Abs([int]$a.G - [int]$b.G)
+                $difference += [Math]::Abs([int]$a.B - [int]$b.B)
+            }
+        }
+        $meanDifference = $difference / (32 * 32 * 3)
+        if ($meanDifference -gt 25) {
+            throw "Packaged executable icon differs from the approved 1.0.9 artwork (mean channel difference $meanDifference)."
+        }
+    } finally {
+        if ($comparison) { $comparison.Dispose() }
+        $expectedBitmap.Dispose()
+        $embeddedBitmap.Dispose()
+        $icon.Dispose()
+    }
 } finally {
     if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Recurse -Force }
 }

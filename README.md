@@ -1,16 +1,17 @@
 # Privacy Browser
 
-Version 1.0.8 is a Windows x64 testing release combining a native .NET/WPF control application,
+Version 1.0.9 is a Windows x64 testing release combining a native .NET/WPF control application,
 an unpacked Mullvad Browser, and the `custom-proxy-build` Myst node from
 `myst-lmprove`. It does not modify the Windows system proxy, DNS servers,
 firewall, or route table.
 
 ## Status
 
-The native integration and portable release packaging are implemented. Version 1.0.8 keeps the explicit per-operation
-deadlines and safe reconciliation introduced in 1.0.5, fixes proxy-mode route/supervisor isolation in the pinned backend,
-consistently addresses the app-owned proxy connection as ID 4449 for status and disconnect operations, and adds
-Mysterium-hosted Stripe card and PayPal top-ups to the fail-closed adapter registry. The payment-target, navigation, identity, readiness,
+The native integration and portable release packaging are implemented. Version 1.0.9 replaces the Windows executable,
+shortcut, taskbar, and WPF window icon with the supplied brown, black-silhouette, and Eiffel Tower artwork. It otherwise retains
+the 1.0.8 Mysterium-hosted Stripe card and PayPal top-ups, the explicit per-operation deadlines and safe reconciliation introduced
+in 1.0.5, the pinned backend's proxy-mode route/supervisor isolation, and app-owned connection ID 4449 handling. The payment-target,
+navigation, identity, readiness,
 browser-process, and bundle-integrity hardening
 from earlier versions remains in place. Packet capture confirms browser payload
 routing through the loopback backend and a Mysterium provider, no direct
@@ -84,7 +85,7 @@ This publishes the WPF app to `app\PrivacyBrowser.exe`. Use
 `-SelfContained` if the target machine does not have the .NET 8 Desktop Runtime.
 
 The executable embeds the official multi-resolution Windows icon and reports
-file/product version `1.0.8`. The native WPF window uses the matching embedded
+file/product version `1.0.9`. The native WPF window uses the matching embedded
 PNG resource so Windows Imaging Component can decode it reliably at startup.
 
 ## Release package
@@ -97,7 +98,7 @@ $env:MYST_RELEASE_TOKEN = "<token with read access to the pinned backend release
 .\tests\Test-ReleasePackage.ps1
 ```
 
-This creates `PrivacyBrowser-1.0.8-windows-x64-portable.zip`, its SHA-256
+This creates `PrivacyBrowser-1.0.9-windows-x64-portable.zip`, its SHA-256
 manifest, and the corresponding `myst-lmprove` source archive. The upstream
 installers are downloaded at pinned hashes and extracted; they are never run.
 
