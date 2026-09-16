@@ -43,7 +43,10 @@ def main() -> None:
             )
 
         # Saving decoded pixels as PNG intentionally strips EXIF and other
-        # source metadata. Pixel values have already been normalized to sRGB.
+        # source metadata. Pixel values have already been normalized to sRGB;
+        # clearing Pillow's generated profile also avoids its timestamp making
+        # otherwise identical PNG output change between runs.
+        rgb.info.clear()
         master = rgb
         master.save(args.output / "OfficialIconSource.png", format="PNG", optimize=True)
         master.save(args.output / "IconMaster.png", format="PNG", optimize=True)

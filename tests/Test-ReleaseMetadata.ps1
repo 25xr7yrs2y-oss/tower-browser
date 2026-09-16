@@ -66,13 +66,13 @@ foreach ($path in @($iconPath, $masterPath, $sourcePath)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Required icon asset missing: $path" }
 }
 $expectedIconHashes = @{
-    "OfficialIconSource.png" = "08581f38e1b9fba59893b5a5a0ec90236901675bdfde2fe4754fa79e9f433086"
-    "IconMaster.png" = "08581f38e1b9fba59893b5a5a0ec90236901675bdfde2fe4754fa79e9f433086"
+    "OfficialIconSource.png" = "d52bc0eb6908dea895db434b011cf8f851cd06aa52d790862e3ceb9c90cbad61"
+    "IconMaster.png" = "d52bc0eb6908dea895db434b011cf8f851cd06aa52d790862e3ceb9c90cbad61"
     "AppIcon.ico" = "0d5e9949b67887406513e3026779797b17bd5d6476b31bd59a7b2d5075ae54d6"
-    "Icons\app-icon-16.png" = "d27c2d1857b4c21c50cd7144bd737408d3dcdcf59d0a61ee3ebda4bda34d7ffd"
-    "Icons\app-icon-32.png" = "1d5ecb8622059c21676ca28701d40b3b496212b39b6fc70e49de520351b500a6"
-    "Icons\app-icon-48.png" = "7005d5f77d30be02fd02e0c08371efce597eae47deadee4497594109dca424eb"
-    "Icons\app-icon-256.png" = "a146d6d2621addea980951b54c98be11b8eabfc47ecc2d5d9dcfa1d8878bcff7"
+    "Icons\app-icon-16.png" = "53d06593e4b2f9ed9ddc7270049e532d2c0913de7784769352f7ff4273e0502b"
+    "Icons\app-icon-32.png" = "c14b6afe26a3f3385b2083afdf9179d8ce5acfdbfc138fffddb5b9394210d841"
+    "Icons\app-icon-48.png" = "fdddb088a5f6a63222c3c4afc9db25a048e8091ee558e0863d21ddcb4a429374"
+    "Icons\app-icon-256.png" = "a6b8359d11cd86ff0b1dff3e173706a7e83b5597d879301b282edb686473392c"
 }
 foreach ($relativePath in $expectedIconHashes.Keys) {
     $actualHash = (Get-FileHash -LiteralPath (Join-Path $assets $relativePath) -Algorithm SHA256).Hash.ToLowerInvariant()
