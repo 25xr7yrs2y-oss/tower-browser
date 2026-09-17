@@ -2,11 +2,11 @@
 param([string]$ReleaseDirectory = (Join-Path (Split-Path $PSScriptRoot -Parent) "release"))
 
 $ErrorActionPreference = "Stop"
-$version = "1.0.9"
-$base = "PrivacyBrowser-$version-windows-x64-portable"
+$version = "1.0.10"
+$base = "TowerBrowser-$version-windows-x64-portable"
 $zip = Join-Path $ReleaseDirectory "$base.zip"
-$source = Join-Path $ReleaseDirectory "PrivacyBrowser-$version-myst-lmprove-source-7944a4c.tar.gz"
-$checksums = Join-Path $ReleaseDirectory "PrivacyBrowser-$version-SHA256SUMS.txt"
+$source = Join-Path $ReleaseDirectory "TowerBrowser-$version-myst-lmprove-source-7944a4c.tar.gz"
+$checksums = Join-Path $ReleaseDirectory "TowerBrowser-$version-SHA256SUMS.txt"
 
 foreach ($path in @($zip, $source, $checksums)) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Release artifact missing: $path" }
@@ -22,11 +22,11 @@ foreach ($path in @($zip, $source)) {
     if ("$actual  $name" -notin $expectedLines) { throw "Checksum file does not match $name." }
 }
 
-$temp = Join-Path ([IO.Path]::GetTempPath()) ("privacy-browser-verify-" + [Guid]::NewGuid().ToString("N"))
+$temp = Join-Path ([IO.Path]::GetTempPath()) ("tower-browser-verify-" + [Guid]::NewGuid().ToString("N"))
 try {
     Expand-Archive -LiteralPath $zip -DestinationPath $temp -Force
     $root = Join-Path $temp $base
-    $exe = Join-Path $root "PrivacyBrowser.exe"
+    $exe = Join-Path $root "TowerBrowser.exe"
     $browser = Join-Path $root "vendor\mullvad-browser\mullvadbrowser.exe"
     $backend = Join-Path $root "vendor\myst-lmprove\resources\app.asar.unpacked\node_modules\@mysteriumnetwork\node\bin\win\x64\myst.exe"
     $bundleManifest = Join-Path $root "bundle-manifest.json"
@@ -64,7 +64,7 @@ try {
         throw "Portable package must not contain or execute the upstream service-installing backend installer."
     }
     $info = (Get-Item -LiteralPath $exe).VersionInfo
-    if ($info.FileVersion -ne "1.0.9.0" -or -not $info.ProductVersion.StartsWith("1.0.9")) {
+    if ($info.FileVersion -ne "1.0.10.0" -or -not $info.ProductVersion.StartsWith("1.0.10")) {
         throw "Packaged executable version metadata is incorrect."
     }
     Add-Type -AssemblyName System.Drawing
@@ -88,7 +88,7 @@ try {
         }
         $meanDifference = $difference / (32 * 32 * 3)
         if ($meanDifference -gt 25) {
-            throw "Packaged executable icon differs from the approved 1.0.9 artwork (mean channel difference $meanDifference)."
+            throw "Packaged executable icon differs from the approved 1.0.10 artwork (mean channel difference $meanDifference)."
         }
     } finally {
         if ($comparison) { $comparison.Dispose() }

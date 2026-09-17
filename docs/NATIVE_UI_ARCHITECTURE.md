@@ -37,7 +37,7 @@ WPF controls -> in-process BackendController -> 44050 TequilAPI -> Myst backend
 Mullvad Browser -> locked 127.0.0.1:4449 -------+-> provider
 ```
 
-`PrivacyBrowser.exe` starts the bundled `myst.exe` directly with
+`TowerBrowser.exe` starts the bundled `myst.exe` directly with
 `--ui.enable=false`, `--usermode`, `--proxymode`, an explicit loopback bind, and
 the same consumer/discovery settings used by the audited Electron backend. It
 therefore never starts the Electron process or the 44051 server.

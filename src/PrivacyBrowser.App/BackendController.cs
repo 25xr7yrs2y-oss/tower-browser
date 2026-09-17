@@ -165,7 +165,7 @@ public sealed class BackendController : IAsyncDisposable
     {
         if (_options.SkipBackendLaunch)
         {
-            throw new InvalidOperationException("An adopted backend cannot be restarted safely. Start Privacy Browser without --skip-backend-launch.");
+            throw new InvalidOperationException("An adopted backend cannot be restarted safely. Start Tower Browser without --skip-backend-launch.");
         }
 
         await StopOwnedProcessAsync(respectKeepRunning: false);

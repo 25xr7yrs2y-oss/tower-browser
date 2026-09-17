@@ -1,28 +1,44 @@
 name: Windows tests
 
 on:
-  push:
   pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-tests-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   powershell-tests:
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+      - name: Read application version
+        id: version
+        shell: pwsh
+        run: |
+          $project = [xml](Get-Content .\src\PrivacyBrowser.App\PrivacyBrowser.App.csproj -Raw)
+          "version=$($project.Project.PropertyGroup.Version)" >> $env:GITHUB_OUTPUT
       - name: Build native Windows application
-        shell: powershell
+        shell: pwsh
         run: .\Build.ps1
       - name: Smoke start native Windows application
-        shell: powershell
+        shell: pwsh
         run: |
-          $process = Start-Process -FilePath .\app\PrivacyBrowser.exe -PassThru
+          $process = Start-Process -FilePath .\app\TowerBrowser.exe -PassThru
           try {
             Start-Sleep -Seconds 5
             if ($process.HasExited) {
-              throw "PrivacyBrowser.exe exited during startup with code $($process.ExitCode)."
+              throw "TowerBrowser.exe exited during startup with code $($process.ExitCode)."
             }
           } finally {
             if (-not $process.HasExited) {
@@ -31,38 +47,21 @@ jobs:
             }
             $process.Dispose()
           }
-      - name: Validate locked policy
-        shell: powershell
-        run: .\tests\Test-Configuration.ps1
-      - name: Validate launcher invariants
-        shell: powershell
-        run: .\tests\Test-Launcher.ps1
-      - name: Validate native architecture invariants
-        shell: powershell
-        run: .\tests\Test-NativeArchitecture.ps1
-      - name: Validate navigation architecture
-        shell: powershell
-        run: .\tests\Test-NavigationArchitecture.ps1
-      - name: Validate backend controls and wallet workflow
-        shell: powershell
-        run: .\tests\Test-BackendControls.ps1
-      - name: Validate hosted payment security invariants
-        shell: powershell
-        run: .\tests\Test-PaymentSecurity.ps1
-      - name: Validate backend deadlines and connection reconciliation
-        shell: powershell
-        run: dotnet run --project .\tests\PrivacyBrowser.BackendController.Tests\PrivacyBrowser.BackendController.Tests.csproj --configuration Release
-      - name: Validate product and security hardening
-        shell: powershell
-        run: .\tests\Test-ProductHardening.ps1
-      - name: Validate version and WPF/embedded icons
-        shell: powershell
-        run: .\tests\Test-ReleaseMetadata.ps1
-      - name: Validate evidence integrity
-        shell: powershell
-        run: .\tests\Test-Evidence.ps1
+      - name: Run repository validation scripts
+        shell: pwsh
+        run: |
+          .\tests\Test-Configuration.ps1
+          .\tests\Test-Launcher.ps1
+          .\tests\Test-NativeArchitecture.ps1
+          .\tests\Test-NavigationArchitecture.ps1
+          .\tests\Test-BackendControls.ps1
+          .\tests\Test-PaymentSecurity.ps1
+          dotnet run --project .\tests\PrivacyBrowser.BackendController.Tests\PrivacyBrowser.BackendController.Tests.csproj --configuration Release
+          .\tests\Test-ProductHardening.ps1
+          .\tests\Test-ReleaseMetadata.ps1
+          .\tests\Test-Evidence.ps1
       - name: Publish self-contained QA application
-        shell: powershell
+        shell: pwsh
         run: |
           dotnet publish .\src\PrivacyBrowser.App\PrivacyBrowser.App.csproj `
             --configuration Release `
@@ -77,12 +76,12 @@ jobs:
       - name: Upload native application
         uses: actions/upload-artifact@v4
         with:
-          name: PrivacyBrowser-1.0.9-windows-x64-app
+          name: TowerBrowser-${{ steps.version.outputs.version }}-windows-x64-app
           path: app/
           if-no-files-found: error
       - name: Upload self-contained QA application
         uses: actions/upload-artifact@v4
         with:
-          name: PrivacyBrowser-1.0.9-windows-x64-self-contained
+          name: TowerBrowser-${{ steps.version.outputs.version }}-windows-x64-self-contained
           path: qa-app/
           if-no-files-found: error

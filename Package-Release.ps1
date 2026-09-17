@@ -5,11 +5,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$version = "1.0.9"
-$packageBase = "PrivacyBrowser-$version-windows-x64-portable"
+$version = "1.0.10"
+$packageBase = "TowerBrowser-$version-windows-x64-portable"
 $portableName = "$packageBase.zip"
-$sourceName = "PrivacyBrowser-$version-myst-lmprove-source-7944a4c.tar.gz"
-$checksumName = "PrivacyBrowser-$version-SHA256SUMS.txt"
+$sourceName = "TowerBrowser-$version-myst-lmprove-source-7944a4c.tar.gz"
+$checksumName = "TowerBrowser-$version-SHA256SUMS.txt"
 $mullvadUrl = "https://github.com/mullvad/mullvad-browser/releases/download/15.0.14/mullvad-browser-windows-x86_64-15.0.14.exe"
 $mullvadHash = "56d5e332b1e780c6413c1a88e7b0a855ec1df5a400a26d92f08585637bc75c02"
 $mystAssetUrl = "https://api.github.com/repos/25xr7yrs2y-oss/myst-lmprove/releases/assets/537461102"
@@ -53,7 +53,7 @@ function Get-VerifiedDownload {
     }
 }
 
-$work = Join-Path ([IO.Path]::GetTempPath()) ("privacy-browser-release-" + [Guid]::NewGuid().ToString("N"))
+$work = Join-Path ([IO.Path]::GetTempPath()) ("tower-browser-release-" + [Guid]::NewGuid().ToString("N"))
 $packageRoot = Join-Path $work $packageBase
 $downloads = Join-Path $work "downloads"
 $extract = Join-Path $work "extract"
@@ -82,9 +82,9 @@ try {
     }
     New-Item -ItemType Directory -Path (Join-Path $packageRoot "config"), (Join-Path $packageRoot "docs") -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "config\policies.json") -Destination (Join-Path $packageRoot "config\policies.json")
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "docs\DEPENDENCIES_1.0.9.md") -Destination (Join-Path $packageRoot "docs\DEPENDENCIES.md")
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "docs\SOURCE_OFFER_1.0.9.md") -Destination (Join-Path $packageRoot "docs\SOURCE_OFFER.md")
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "docs\PAYMENT_SECURITY_1.0.9.md") -Destination (Join-Path $packageRoot "docs\PAYMENT_SECURITY.md")
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "docs\DEPENDENCIES_1.0.10.md") -Destination (Join-Path $packageRoot "docs\DEPENDENCIES.md")
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "docs\SOURCE_OFFER_1.0.10.md") -Destination (Join-Path $packageRoot "docs\SOURCE_OFFER.md")
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "docs\PAYMENT_SECURITY_1.0.10.md") -Destination (Join-Path $packageRoot "docs\PAYMENT_SECURITY.md")
 
     $mullvadInstaller = Join-Path $downloads "mullvad-browser-15.0.14.exe"
     Get-VerifiedDownload -Uri $mullvadUrl -Destination $mullvadInstaller -ExpectedSha256 $mullvadHash
@@ -110,7 +110,7 @@ try {
     # The archive checksum authenticates the download. This in-bundle manifest then
     # detects missing, stale, or mixed critical components after users extract it.
     $criticalComponents = @(
-        (Join-Path $packageRoot "PrivacyBrowser.exe"),
+        (Join-Path $packageRoot "TowerBrowser.exe"),
         (Join-Path $packageRoot "config\policies.json"),
         (Join-Path $browserDestination "mullvadbrowser.exe"),
         (Join-Path $mystDestination "myst.exe")

@@ -7,13 +7,16 @@ function Assert-Equal($Actual, $Expected, [string]$Message) {
     if ($Actual -ne $Expected) { throw "$Message (expected '$Expected', got '$Actual')" }
 }
 
-Assert-Equal $properties.Version "1.0.9" "Application version must be 1.0.9"
-Assert-Equal $properties.VersionPrefix "1.0.9" "Application version prefix must be 1.0.9"
-Assert-Equal $properties.PackageVersion "1.0.9" "Package version must be 1.0.9"
-Assert-Equal $properties.AssemblyVersion "1.0.9.0" "Assembly version must be 1.0.9.0"
-Assert-Equal $properties.FileVersion "1.0.9.0" "File version must be 1.0.9.0"
-Assert-Equal $properties.InformationalVersion "1.0.9" "Informational version must be 1.0.9"
+Assert-Equal $properties.Version "1.0.10" "Application version must be 1.0.10"
+Assert-Equal $properties.VersionPrefix "1.0.10" "Application version prefix must be 1.0.10"
+Assert-Equal $properties.PackageVersion "1.0.10" "Package version must be 1.0.10"
+Assert-Equal $properties.AssemblyVersion "1.0.10.0" "Assembly version must be 1.0.10.0"
+Assert-Equal $properties.FileVersion "1.0.10.0" "File version must be 1.0.10.0"
+Assert-Equal $properties.InformationalVersion "1.0.10" "Informational version must be 1.0.10"
 Assert-Equal $properties.ApplicationIcon "Assets\AppIcon.ico" "Executable icon declaration is missing"
+Assert-Equal $properties.AssemblyName "TowerBrowser" "Executable name must use Tower Browser branding"
+Assert-Equal $properties.Product "Tower Browser" "Product metadata must use Tower Browser branding"
+Assert-Equal $properties.AssemblyTitle "Tower Browser" "Assembly title must use Tower Browser branding"
 
 $assets = Join-Path $root "src\PrivacyBrowser.App\Assets"
 $iconPath = Join-Path $assets "AppIcon.ico"
@@ -24,12 +27,11 @@ $manifest = Get-Content (Join-Path $root "src\PrivacyBrowser.App\app.manifest") 
 $packageScript = Get-Content (Join-Path $root "Package-Release.ps1") -Raw
 $testWorkflow = Get-Content (Join-Path $root ".github\workflows\test.yml") -Raw
 $releaseWorkflow = Get-Content (Join-Path $root ".github\workflows\release-package.yml") -Raw
-$publishWorkflow = Get-Content (Join-Path $root ".github\workflows\publish-release.yml") -Raw
 if (-not $windowXaml.Contains('Icon="Assets/Icons/app-icon-256.png"')) { throw "The WPF window does not use the WPF-compatible official icon." }
-if (-not $manifest.Contains('assemblyIdentity version="1.0.9.0"')) { throw "Manifest version is not 1.0.9.0." }
-if (-not $manifest.Contains('name="PrivacyBrowser"')) { throw "Manifest application identity is inconsistent." }
-foreach ($needle in @('$version = "1.0.9"', 'DEPENDENCIES_1.0.9.md', 'SOURCE_OFFER_1.0.9.md',
-        'PAYMENT_SECURITY_1.0.9.md')) {
+if (-not $manifest.Contains('assemblyIdentity version="1.0.10.0"')) { throw "Manifest version is not 1.0.10.0." }
+if (-not $manifest.Contains('name="TowerBrowser"')) { throw "Manifest application identity is inconsistent." }
+foreach ($needle in @('$version = "1.0.10"', 'DEPENDENCIES_1.0.10.md', 'SOURCE_OFFER_1.0.10.md',
+        'PAYMENT_SECURITY_1.0.10.md')) {
     if (-not $packageScript.Contains($needle)) { throw "Release package version invariant missing: $needle" }
 }
 foreach ($needle in @('releases/assets/537461102',
@@ -37,23 +39,20 @@ foreach ($needle in @('releases/assets/537461102',
         '7944a4c634834aac10a4e8e49934e326ac3f0e7a')) {
     if (-not $packageScript.Contains($needle)) { throw "Pinned backend provenance invariant missing: $needle" }
 }
-if (-not $releaseWorkflow.Contains('PrivacyBrowser-1.0.9-release-assets')) {
-    throw "Release-package workflow artifact name is not version 1.0.9."
+foreach ($needle in @('name: Tower Browser release', '- "v*.*.*"',
+        "'^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$'",
+        'git merge-base --is-ancestor HEAD origin/main',
+        'TowerBrowser-$VERSION-SHA256SUMS.txt', 'RELEASE_NOTES_$VERSION.md',
+        'refusing to overwrite assets')) {
+    if (-not $releaseWorkflow.Contains($needle)) { throw "General release workflow invariant missing: $needle" }
 }
-if (-not $releaseWorkflow.Contains('- "v1.0.9"')) {
-    throw "Release-package workflow tag trigger is not pinned to v1.0.9."
+foreach ($needle in @('TowerBrowser-${{ steps.version.outputs.version }}-windows-x64-app',
+        'TowerBrowser-${{ steps.version.outputs.version }}-windows-x64-self-contained',
+        'branches:', '- main')) {
+    if (-not $testWorkflow.Contains($needle)) { throw "Windows-test workflow invariant missing: $needle" }
 }
-foreach ($needle in @('PrivacyBrowser-1.0.9-windows-x64-app',
-        'PrivacyBrowser-1.0.9-windows-x64-self-contained')) {
-    if (-not $testWorkflow.Contains($needle)) { throw "Windows-test artifact version invariant missing: $needle" }
-}
-foreach ($needle in @('default: v1.0.9', 'Privacy Browser Prototype Demo v1.0.9',
-        'PrivacyBrowser-1.0.9-SHA256SUMS.txt', 'RELEASE_NOTES_1.0.9.md',
-        'test "$TAG" = "v1.0.9"')) {
-    if (-not $publishWorkflow.Contains($needle)) { throw "Publish workflow version invariant missing: $needle" }
-}
-foreach ($file in @('DEPENDENCIES_1.0.9.md', 'SOURCE_OFFER_1.0.9.md', 'RELEASE_NOTES_1.0.9.md',
-        'PAYMENT_SECURITY_1.0.9.md')) {
+foreach ($file in @('DEPENDENCIES_1.0.10.md', 'SOURCE_OFFER_1.0.10.md', 'RELEASE_NOTES_1.0.10.md',
+        'PAYMENT_SECURITY_1.0.10.md')) {
     if (-not (Test-Path -LiteralPath (Join-Path $root "docs\$file") -PathType Leaf)) {
         throw "Release document is missing: $file"
     }
@@ -142,11 +141,11 @@ foreach ($expected in @(16, 20, 24, 32, 40, 48, 64, 128, 256)) {
     if ($expected -notin $icoSizes) { throw "ICO size entry missing: $expected" }
 }
 
-$exe = Join-Path $root "app\PrivacyBrowser.exe"
+$exe = Join-Path $root "app\TowerBrowser.exe"
 if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "Built executable missing: $exe" }
 $version = (Get-Item -LiteralPath $exe).VersionInfo
-Assert-Equal $version.FileVersion "1.0.9.0" "Executable file version is incorrect"
-if (-not $version.ProductVersion.StartsWith("1.0.9")) { throw "Executable product version is incorrect: $($version.ProductVersion)" }
+Assert-Equal $version.FileVersion "1.0.10.0" "Executable file version is incorrect"
+if (-not $version.ProductVersion.StartsWith("1.0.10")) { throw "Executable product version is incorrect: $($version.ProductVersion)" }
 
 Add-Type -AssemblyName System.Drawing
 $embeddedIcon = [Drawing.Icon]::ExtractAssociatedIcon($exe)
@@ -176,4 +175,4 @@ try {
     $embeddedIcon.Dispose()
 }
 
-Write-Host "PASS: version 1.0.9 metadata and the approved WPF-compatible/PE artwork are embedded."
+Write-Host "PASS: Tower Browser 1.0.10 metadata and the approved WPF-compatible/PE artwork are embedded."

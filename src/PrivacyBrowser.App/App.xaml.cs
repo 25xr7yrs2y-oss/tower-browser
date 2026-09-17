@@ -15,8 +15,8 @@ public partial class App : Application
                 "Local\\PrivacyBrowser.NativeController", out var isFirstInstance);
             if (!isFirstInstance)
             {
-                MessageBox.Show("Privacy Browser is already running. Use the existing window and isolated profile.",
-                    "Privacy Browser", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Tower Browser is already running. Use the existing window and isolated profile.",
+                    "Tower Browser", MessageBoxButton.OK, MessageBoxImage.Information);
                 _instanceMutex.Dispose();
                 _instanceMutex = null;
                 Shutdown(0);
@@ -36,7 +36,7 @@ public partial class App : Application
             {
                 message += $"{Environment.NewLine}{Environment.NewLine}Diagnostic details: {logPath}";
             }
-            MessageBox.Show(message, "Privacy Browser", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(message, "Tower Browser", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
     }

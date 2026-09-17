@@ -23,7 +23,7 @@ public static class BundleValidator
             if (isPackagedLayout)
             {
                 throw new InvalidOperationException(
-                    "The portable bundle manifest is missing. Re-extract a verified Privacy Browser package.");
+                    "The portable bundle manifest is missing. Re-extract a verified Tower Browser package.");
             }
             return;
         }
@@ -83,7 +83,7 @@ public static class BundleValidator
                 Path.GetFullPath(options.BrowserExe),
                 Path.GetFullPath(options.BackendExe),
                 Path.GetFullPath(Path.Combine(options.BundleRoot, "config", "policies.json")),
-                Path.GetFullPath(Path.Combine(options.BundleRoot, "PrivacyBrowser.exe")),
+                Path.GetFullPath(Path.Combine(options.BundleRoot, "TowerBrowser.exe")),
             })
             {
                 if (!verifiedPaths.Contains(requiredPath))

@@ -32,8 +32,8 @@ public partial class MainWindow : Window
         _options = options;
         _stateStore = new UserStateStore(options.BundleRoot);
         _selectedIdentityId = _stateStore.LoadSelectedIdentityId();
-        var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.9";
-        Title = $"Privacy Browser {version}";
+        var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.10";
+        Title = $"Tower Browser {version}";
         _backend = new BackendController(options);
         _browser = new BrowserLauncher(options, _backend);
         _backend.Log += message => Dispatcher.BeginInvoke(() =>
@@ -81,7 +81,7 @@ public partial class MainWindow : Window
         if (_closing) return;
         if (_browser.IsBrowserRunning && MessageBox.Show(
                 "The isolated browser is still running. Closing the controller will stop its provider connection and the browser will fail closed. Close anyway?",
-                "Privacy Browser", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                "Tower Browser", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
         {
             e.Cancel = true;
             return;
@@ -142,7 +142,7 @@ public partial class MainWindow : Window
     {
         string? passphrase = PromptForPassphrase(
             "Protect a new identity",
-            "Create a passphrase for this identity. It is required for registration and provider connections and is not stored by Privacy Browser.",
+            "Create a passphrase for this identity. It is required for registration and provider connections and is not stored by Tower Browser.",
             "Create identity", requireConfirmation: true, minimumLength: 12);
         if (passphrase is null) return;
         await RunOperationAsync(OperationFeedbackArea.Identity, "Creating a local identity…", "Identity created and selected.", async () =>
