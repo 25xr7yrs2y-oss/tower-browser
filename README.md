@@ -8,9 +8,9 @@ firewall, or route table.
 
 ## Project status and support
 
-Version 1.0.10 is the normalized stable release line. Until its tag and release
-are published, v1.0.9 remains the validated baseline. Versions v1.0.0-v1.0.8
-are archived, unsupported test builds. See [SUPPORT.md](SUPPORT.md),
+Version 1.0.10 is the current supported stable release. Version v1.0.9 is a
+historical validated baseline, and versions v1.0.0-v1.0.8 are archived,
+unsupported test builds. See [SUPPORT.md](SUPPORT.md),
 [CHANGELOG.md](CHANGELOG.md), and the
 [GitHub releases page](https://github.com/25xr7yrs2y-oss/tower-browser/releases).
 

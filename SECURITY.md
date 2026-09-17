@@ -4,8 +4,8 @@
 
 | Version | Status |
 |---|---|
-| 1.0.10 | Supported stable line after publication |
-| 1.0.9 | Validated baseline until 1.0.10 is published |
+| 1.0.10 | Current supported stable release |
+| 1.0.9 | Historical validated baseline; unsupported |
 | 1.0.0-1.0.8 | Unsupported historical test builds |
 
 Security fixes are made on the current supported line. Historical releases and
