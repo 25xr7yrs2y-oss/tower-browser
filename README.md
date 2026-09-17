@@ -1,4 +1,4 @@
-# Privacy Browser
+# tower Browser
 
 Version 1.0.7 is a Windows x64 testing release combining a native .NET/WPF control application,
 an unpacked Mullvad Browser, and the `custom-proxy-build` Myst node from
