@@ -1,9 +1,10 @@
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
-$launcher = Get-Content (Join-Path $root "Start-PrivacyBrowser.ps1") -Raw
+$launcher = Get-Content (Join-Path $root "Start-TowerBrowser.ps1") -Raw
+$compatibilityLauncher = Get-Content (Join-Path $root "Start-PrivacyBrowser.ps1") -Raw
 
 $required = @(
-    'app\PrivacyBrowser.exe',
+    'app\TowerBrowser.exe',
     '"--bundle-root", $PSScriptRoot',
     '"--browser-exe", (Resolve-Path $BrowserExe).Path',
     '"--backend-exe", $BackendExe',
@@ -13,6 +14,10 @@ $required = @(
 )
 foreach ($needle in $required) {
     if (-not $launcher.Contains($needle)) { throw "Launcher invariant missing: $needle" }
+}
+
+if (-not $compatibilityLauncher.Contains('Start-TowerBrowser.ps1')) {
+    throw "The legacy launcher must delegate to the canonical Tower Browser launcher."
 }
 
 $forbidden = @(

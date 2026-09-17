@@ -56,7 +56,7 @@ Audited branch: `25xr7yrs2y-oss/myst-lmprove@7944a4c`, branch
   provider negotiation use the backend's direct HTTP/P2P clients. These direct
   connections are allowed, must be attributed to backend processes, and are
   not browser payload.
-- Lifecycle: `PrivacyBrowser.exe` owns the Myst child. Its close path calls
+- Lifecycle: `TowerBrowser.exe` owns the Myst child. Its close path calls
   the daemon's existing `POST /stop` endpoint on port 44050, waits for graceful
   exit, and terminates only the process tree it started if graceful shutdown
   times out. The removed `/api/node/stop` path belonged to the port 44051 web UI.
@@ -128,7 +128,7 @@ proxyclient path, but the installer is not acceptable for a browser-scoped
 package as-is. The test installation was uninstalled and the service was
 verified absent.
 
-Version 1.0.9 continues the 1.0.6 packaging change and does not extract the backend from that installer. Packaging
+Version 1.0.10 continues the 1.0.6 packaging change and does not extract the backend from that installer. Packaging
 pins the trusted workflow's raw `myst-windows-x64.exe` release asset and verifies
 its SHA-256 before copying it into the portable bundle; no supervisor executable
 or installer is included or executed.

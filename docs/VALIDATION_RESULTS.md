@@ -2,9 +2,11 @@
 
 ## Current status
 
-### Version 1.0.9 validation scope
+### Version 1.0.10 validation scope
 
-The 1.0.9 automated suite retains the 1.0.8 Mysterium-hosted Stripe/PayPal client
+Version 1.0.10 is a branding, documentation, and release-automation maintenance
+release based on the 1.0.9 application behavior. Its Windows suite retains the
+1.0.8 Mysterium-hosted Stripe/PayPal client
 contract validation with deterministic fake TequilAPI responses and static native-UI
 invariants. It also validates fixed hashes for the supplied icon artwork and its
 derived WPF/Windows assets, WIC decoding of every ICO frame, and comparison of

@@ -52,7 +52,12 @@ public sealed record AppOptions(
 
     private static string FindBundleRoot()
     {
-        var configured = Environment.GetEnvironmentVariable("PRIVACY_BROWSER_ROOT");
+        var configured = Environment.GetEnvironmentVariable("TOWER_BROWSER_ROOT");
+        // Preserve the legacy variable for existing development setups.
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            configured = Environment.GetEnvironmentVariable("PRIVACY_BROWSER_ROOT");
+        }
         if (!string.IsNullOrWhiteSpace(configured))
         {
             return Path.GetFullPath(configured);
