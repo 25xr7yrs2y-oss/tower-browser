@@ -37,8 +37,11 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0">
-                                <TextBlock Text="Amount (MYST)" Margin="0,0,0,6" FontWeight="SemiBold" />
+                                <TextBlock x:Name="AmountLabelText" Text="Amount" Margin="0,0,0,6" FontWeight="SemiBold" />
                                 <TextBox x:Name="AmountTextBox" Text="20" />
+                                <TextBlock Text="Suggested amount" Margin="0,9,0,4" FontWeight="SemiBold" />
+                                <ComboBox x:Name="SuggestedAmountComboBox" DisplayMemberPath="Display"
+                                          SelectionChanged="SuggestedAmountComboBox_SelectionChanged" />
                             </StackPanel>
                             <StackPanel Grid.Column="2">
                                 <TextBlock Text="Pay with" Margin="0,0,0,6" FontWeight="SemiBold" />
@@ -73,6 +76,10 @@
                                     Visibility="Collapsed" />
                             <Button x:Name="CopyPaymentButton" Content="Copy payment details" Click="CopyPaymentButton_Click"
                                     Style="{StaticResource SecondaryButton}" />
+                            <Button x:Name="RefreshStatusButton" Content="Refresh status" Click="RefreshStatusButton_Click"
+                                    Style="{StaticResource SecondaryButton}" />
+                            <Button x:Name="ClearCompletedButton" Content="Clear completed order" Click="ClearCompletedButton_Click"
+                                    Visibility="Collapsed" Style="{StaticResource SecondaryButton}" />
                         </WrapPanel>
                     </StackPanel>
                 </Border>

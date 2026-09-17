@@ -10,6 +10,9 @@ var tests = new (string Name, Func<Task> Run)[]
     ("provider connect deadline reconciles instead of issuing a duplicate", ProviderConnectDeadlineReconciles),
     ("provider discovery may outlive ordinary 15 second budget", ProviderDiscoveryMayOutliveOrdinaryBudget),
     ("payment gateway discovery and creation fail closed", PaymentGatewayDiscoveryAndCreationFailClosed),
+    ("ambiguous payment POST reconciles once without duplicate creation", AmbiguousPaymentPostReconcilesWithoutDuplicate),
+    ("single active payment order is enforced", SingleActivePaymentOrderIsEnforced),
+    ("payment poll reports paid and balance evidence independently", PaymentPollSeparatesPaidAndBalance),
     ("ordinary operation deadline is enforced", OrdinaryDeadlineIsEnforced),
     ("caller cancellation differs from deadline expiry", CallerCancellationDiffersFromTimeout),
     ("canceled connect remains indeterminate until reconciled", CanceledConnectRequiresReconciliation),
@@ -106,20 +109,16 @@ static async Task PaymentGatewayDiscoveryAndCreationFailClosed()
         requestCount++;
         Equal(HttpMethod.Get, request.Method);
         Equal("/v2/payment-order-gateways", request.RequestUri!.AbsolutePath);
-        Equal("?options_currency=MYST", request.RequestUri.Query);
-        return Task.FromResult(Response(HttpStatusCode.OK, """
-            [
-              {"name":"coingate","order_options":{"minimum":1,"suggested":[2]},"currencies":["USD"]},
-              {"name":"stripe","order_options":{"minimum":1,"suggested":[2]},"currencies":["USD"]},
-              {"name":"CoinGate","order_options":{"minimum":1,"suggested":[2]},"currencies":["USD"]}
-            ]
-            """));
+        var json = request.RequestUri.Query == "?options_currency=MYST"
+            ? """[{"name":"coingate","order_options":{"minimum":1,"suggested":[2]},"currencies":["BTC"]}]"""
+            : """[{"name":"stripe","order_options":{"minimum":0.5,"suggested":[1]},"currencies":["USD"]},{"name":"paypal","order_options":{"minimum":0.5,"suggested":[1]},"currencies":["USD"]},{"name":"Stripe","order_options":{"minimum":0.5,"suggested":[1]},"currencies":["USD"]}]""";
+        return Task.FromResult(Response(HttpStatusCode.OK, json));
     }), timeouts);
 
     var gateways = await controller.GetPaymentGatewaysAsync();
-    Equal(1, gateways.Count);
+    Equal(3, gateways.Count);
     Equal(CoinGatePaymentGatewayAdapter.CanonicalGatewayName, gateways[0].Name);
-    Equal(1, requestCount);
+    Equal(2, requestCount);
 
     var unsupported = new PaymentGateway
     {
@@ -127,8 +126,102 @@ static async Task PaymentGatewayDiscoveryAndCreationFailClosed()
         Currencies = ["USD"],
     };
     await ThrowsAsync<InvalidOperationException>(() => controller.CreatePaymentOrderAsync(
-        "identity", unsupported, 2m, "USD", "US", ""));
-    Equal(1, requestCount);
+        "identity", unsupported, "2.00", "USD", "US", "CA"));
+    Equal(2, requestCount);
+}
+
+static async Task AmbiguousPaymentPostReconcilesWithoutDuplicate()
+{
+    var root = TemporaryRoot();
+    var postCount = 0;
+    var listCount = 0;
+    try
+    {
+        var timeouts = TestTimeouts(ordinaryMs: 30, discoveryMs: 80, connectMs: 100);
+        await using var controller = Controller(new FakeHandler(async (request, token) =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (request.Method == HttpMethod.Put && path.EndsWith("/balance/refresh", StringComparison.Ordinal))
+                return Response(HttpStatusCode.OK, "{\"balance_tokens\":{\"wei\":\"100\",\"ether\":\"0\",\"human\":\"0\"}}");
+            if (request.Method == HttpMethod.Get && path.EndsWith("/payment-order", StringComparison.Ordinal))
+            {
+                listCount++;
+                return listCount == 1
+                    ? Response(HttpStatusCode.OK, "[]")
+                    : Response(HttpStatusCode.OK, StripeOrders("order-reconciled", "new"));
+            }
+            if (request.Method == HttpMethod.Post && path.EndsWith("/stripe/payment-order", StringComparison.Ordinal))
+            {
+                postCount++;
+                await Task.Delay(Timeout.InfiniteTimeSpan, token);
+            }
+            return Response(HttpStatusCode.NotFound, "{}");
+        }), timeouts, bundleRoot: root);
+
+        var created = await controller.CreatePaymentOrderAsync(
+            "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", StripeGateway(), "1.00", "USD", "US", "CA");
+        Equal("order-reconciled", created.Order.Id);
+        Equal(1, postCount);
+        Equal(2, listCount);
+    }
+    finally { Directory.Delete(root, recursive: true); }
+}
+
+static async Task SingleActivePaymentOrderIsEnforced()
+{
+    var root = TemporaryRoot();
+    var postCount = 0;
+    try
+    {
+        var timeouts = TestTimeouts(ordinaryMs: 80, discoveryMs: 100, connectMs: 120);
+        await using var controller = Controller(new FakeHandler((request, _) =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (request.Method == HttpMethod.Put && path.EndsWith("/balance/refresh", StringComparison.Ordinal))
+                return Task.FromResult(Response(HttpStatusCode.OK, "{\"balance_tokens\":{\"wei\":\"100\",\"ether\":\"0\",\"human\":\"0\"}}"));
+            if (request.Method == HttpMethod.Get && path.EndsWith("/payment-order", StringComparison.Ordinal))
+                return Task.FromResult(Response(HttpStatusCode.OK, "[]"));
+            if (request.Method == HttpMethod.Post && path.EndsWith("/stripe/payment-order", StringComparison.Ordinal))
+            {
+                postCount++;
+                return Task.FromResult(Response(HttpStatusCode.OK, StripeOrder("order-one", "new")));
+            }
+            return Task.FromResult(Response(HttpStatusCode.NotFound, "{}"));
+        }), timeouts, bundleRoot: root);
+
+        await controller.CreatePaymentOrderAsync("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", StripeGateway(), "1.00", "USD", "US", "CA");
+        await ThrowsAsync<InvalidOperationException>(() =>
+            controller.CreatePaymentOrderAsync("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", StripeGateway(), "1.00", "USD", "US", "CA"));
+        Equal(1, postCount);
+    }
+    finally { Directory.Delete(root, recursive: true); }
+}
+
+static async Task PaymentPollSeparatesPaidAndBalance()
+{
+    var root = TemporaryRoot();
+    try
+    {
+        var created = DateTimeOffset.UtcNow;
+        new PaymentJournalStore(root).Save(new PaymentJournalEntry(
+            "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "stripe", "order-one", "1.00", "USD", "USD", "10", "100", created, created, "confirming"));
+        var timeouts = TestTimeouts(ordinaryMs: 80, discoveryMs: 100, connectMs: 120);
+        await using var controller = Controller(new FakeHandler((request, _) =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (request.Method == HttpMethod.Get && path.EndsWith("/payment-order/order-one", StringComparison.Ordinal))
+                return Task.FromResult(Response(HttpStatusCode.OK, StripeOrder("order-one", "paid")));
+            if (request.Method == HttpMethod.Put && path.EndsWith("/balance/refresh", StringComparison.Ordinal))
+                return Task.FromResult(Response(HttpStatusCode.OK, "{\"balance_tokens\":{\"wei\":\"100\",\"ether\":\"0\",\"human\":\"0\"}}"));
+            return Task.FromResult(Response(HttpStatusCode.NotFound, "{}"));
+        }), timeouts, bundleRoot: root);
+
+        var snapshot = await controller.PollPaymentOrderAsync();
+        True(snapshot.IsPaid);
+        True(!snapshot.BalanceIncreased);
+        True(!snapshot.CreditedSuccess);
+    }
+    finally { Directory.Delete(root, recursive: true); }
 }
 
 static async Task ProviderDiscoveryMayOutliveOrdinaryBudget()
@@ -440,9 +533,32 @@ static async Task MalformedAndHttpErrorsRemainDistinct()
 static BackendController Controller(
     HttpMessageHandler handler,
     BackendTimeouts timeouts,
-    Func<bool>? connectedVerifier = null) =>
-    new(new AppOptions(".", "browser.exe", "myst.exe", "profile", "about:blank", [], false, true),
+    Func<bool>? connectedVerifier = null,
+    string? bundleRoot = null) =>
+    new(new AppOptions(bundleRoot ?? ".", "browser.exe", "myst.exe", "profile", "about:blank", [], false, true),
         handler, timeouts, connectedStateVerifier: connectedVerifier);
+
+static string TemporaryRoot()
+{
+    var root = Path.Combine(Path.GetTempPath(), "privacy-browser-backend-test-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    return root;
+}
+
+static PaymentGateway StripeGateway() => new()
+{
+    Name = "stripe",
+    Currencies = ["USD"],
+    OrderOptions = new PaymentOrderOptions { Minimum = 0.50m, Suggested = [1.00m] },
+};
+
+static string StripeOrders(string id, string status) => $"[{StripeOrder(id, status)}]";
+
+static string StripeOrder(string id, string status) =>
+    "{\"id\":\"" + id + "\",\"status\":\"" + status +
+    "\",\"identity\":\"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"gateway_name\":\"stripe\"," +
+    "\"receive_myst\":\"10\",\"pay_amount\":\"1.00\",\"pay_currency\":\"USD\"," +
+    "\"public_gateway_data\":{\"checkout_url\":\"https://checkout.stripe.com/c/pay/test\"}}";
 
 static BackendTimeouts TestTimeouts(int ordinaryMs, int discoveryMs, int connectMs) => new(
     TimeSpan.FromMilliseconds(20),

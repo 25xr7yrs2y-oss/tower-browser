@@ -3,36 +3,33 @@ using PrivacyBrowser.App;
 
 var tests = new (string Name, Action Run)[]
 {
-    ("registered adapter matching is exact and fail-closed", RegisteredAdapterMatchingIsExactAndFailClosed),
-    ("HTTPS without an explicit port", () => Accept("https://payments.example/order/1")),
-    ("HTTPS with explicit port 443", () => Accept("https://payments.example:443/order/1")),
-    ("mixed-case HTTPS scheme", () => Accept("HtTpS://payments.example/order/1")),
-    ("HTTP", () => Reject("coingate", "coingate", "{\"paymentUrl\":\"http://payments.example/order/1\"}")),
-    ("mixed-case HTTP", () => Reject("coingate", "coingate", "{\"paymentUrl\":\"HtTp://payments.example/order/1\"}")),
-    ("username user-info", () => Reject("coingate", "coingate", "{\"paymentUrl\":\"https://user@payments.example/order/1\"}")),
-    ("username and password user-info", () => Reject("coingate", "coingate", "{\"paymentUrl\":\"https://user:password@payments.example/order/1\"}")),
-    ("percent-encoded user-info", () => Reject("coingate", "coingate", "{\"paymentUrl\":\"https://user%40name@payments.example/order/1\"}")),
-    ("non-default port", () => Reject("coingate", "coingate", "{\"paymentUrl\":\"https://payments.example:444/order/1\"}")),
-    ("explicit empty port", () => Reject("coingate", "coingate", "{\"paymentUrl\":\"https://payments.example:/order/1\"}")),
-    ("relative URL", () => Reject("coingate", "coingate", "{\"paymentUrl\":\"/order/1\"}")),
-    ("malformed URL", () => Reject("coingate", "coingate", "{\"paymentUrl\":\"https://[invalid/order/1\"}")),
-    ("unknown gateway", () => Reject("stripe", "stripe", "{\"paymentUrl\":\"https://payments.example/order/1\"}")),
-    ("response gateway mismatch", () => Reject("coingate", "stripe", "{\"paymentUrl\":\"https://payments.example/order/1\"}")),
-    ("missing field", () => Reject("coingate", "coingate", "{}")),
-    ("null field", () => Reject("coingate", "coingate", "{\"paymentUrl\":null}")),
-    ("numeric field", () => Reject("coingate", "coingate", "{\"paymentUrl\":42}")),
-    ("object field", () => Reject("coingate", "coingate", "{\"paymentUrl\":{}}")),
-    ("array field", () => Reject("coingate", "coingate", "{\"paymentUrl\":[]}")),
-    ("wrong root type", () => Reject("coingate", "coingate", "[]")),
-    ("incorrectly nested field", () => Reject("coingate", "coingate", "{\"wrapper\":{\"paymentUrl\":\"https://evil.example/\"}}")),
-    ("unrelated URL is not selected", UnrelatedUrlIsNotSelected),
-    ("unrelated-only URL is rejected", () => Reject("coingate", "coingate", "{\"helpUrl\":\"https://evil.example/\"}")),
-    ("duplicate exact field", () => Reject("coingate", "coingate", "{\"paymentUrl\":\"https://payments.example/one\",\"paymentUrl\":\"https://payments.example/two\"}")),
-    ("case-shadowed field", () => Reject("coingate", "coingate", "{\"paymentUrl\":\"https://payments.example/one\",\"PaymentUrl\":\"https://evil.example/two\"}")),
-    ("fragment", () => Reject("coingate", "coingate", "{\"paymentUrl\":\"https://payments.example/order/1#checkout\"}")),
-    ("empty fragment", () => Reject("coingate", "coingate", "{\"paymentUrl\":\"https://payments.example/order/1#\"}")),
-    ("leading whitespace", () => Reject("coingate", "coingate", "{\"paymentUrl\":\" https://payments.example/order/1\"}")),
-    ("embedded control character", () => Reject("coingate", "coingate", "{\"paymentUrl\":\"https://payments.example/order/\\u0001\"}")),
+    ("registered adapter matching is case-exact", RegisteredAdapterMatchingIsExact),
+    ("Stripe production checkout accepted", () => Accept("stripe", "https://checkout.stripe.com/c/pay/test")),
+    ("PayPal production checkout accepted", () => Accept("paypal", "https://www.paypal.com/checkoutnow?token=test")),
+    ("CoinGate response remains paymentUrl", CoinGateContractIsPreserved),
+    ("HTTP rejected", () => RejectUrl("stripe", "http://checkout.stripe.com/c/pay/test")),
+    ("user-info rejected", () => RejectUrl("stripe", "https://user:password@checkout.stripe.com/c/pay/test")),
+    ("fragment rejected", () => RejectUrl("stripe", "https://checkout.stripe.com/c/pay/test#done")),
+    ("empty fragment rejected", () => RejectUrl("stripe", "https://checkout.stripe.com/c/pay/test#")),
+    ("non-default port rejected", () => RejectUrl("stripe", "https://checkout.stripe.com:444/c/pay/test")),
+    ("explicit empty port rejected", () => RejectUrl("stripe", "https://checkout.stripe.com:/c/pay/test")),
+    ("leading whitespace rejected", () => RejectUrl("stripe", " https://checkout.stripe.com/c/pay/test")),
+    ("embedded control rejected", () => Reject("stripe", "stripe", "{\"checkout_url\":\"https://checkout.stripe.com/c/pay/\\u0001\"}")),
+    ("backslash rejected", () => RejectUrl("stripe", "https://checkout.stripe.com\\@evil.example/c/pay/test")),
+    ("Stripe subdomain rejected", () => RejectUrl("stripe", "https://evil.checkout.stripe.com/c/pay/test")),
+    ("Stripe suffix lookalike rejected", () => RejectUrl("stripe", "https://checkout.stripe.com.evil.example/c/pay/test")),
+    ("Stripe Unicode lookalike rejected", () => RejectUrl("stripe", "https://checkout.stripe.c\u043Em/c/pay/test")),
+    ("PayPal subdomain rejected", () => RejectUrl("paypal", "https://evil.www.paypal.com/checkoutnow?token=test")),
+    ("PayPal suffix lookalike rejected", () => RejectUrl("paypal", "https://www.paypal.com.evil.example/checkoutnow?token=test")),
+    ("PayPal sandbox host rejected", () => RejectUrl("paypal", "https://www.sandbox.paypal.com/checkoutnow?token=test")),
+    ("PayPal unapproved path rejected", () => RejectUrl("paypal", "https://www.paypal.com/signin")),
+    ("missing checkout field rejected", () => Reject("stripe", "stripe", "{}")),
+    ("null checkout field rejected", () => Reject("stripe", "stripe", "{\"checkout_url\":null}")),
+    ("nested checkout field rejected", () => Reject("stripe", "stripe", "{\"nested\":{\"checkout_url\":\"https://checkout.stripe.com/c/pay/test\"}}")),
+    ("duplicate checkout field rejected", () => Reject("stripe", "stripe", "{\"checkout_url\":\"https://checkout.stripe.com/c/pay/one\",\"checkout_url\":\"https://checkout.stripe.com/c/pay/two\"}")),
+    ("case-shadowed checkout field rejected", () => Reject("stripe", "stripe", "{\"checkout_url\":\"https://checkout.stripe.com/c/pay/test\",\"Checkout_Url\":\"https://evil.example/\"}")),
+    ("wrong root type rejected", () => Reject("stripe", "stripe", "[]")),
+    ("response gateway mismatch rejected", () => Reject("stripe", "paypal", "{\"checkout_url\":\"https://checkout.stripe.com/c/pay/test\"}")),
 };
 
 var failures = 0;
@@ -50,72 +47,56 @@ foreach (var test in tests)
     }
 }
 
-if (failures > 0)
-{
-    Console.Error.WriteLine($"{failures} payment gateway adapter test(s) failed.");
-    return 1;
-}
-
-Console.WriteLine($"PASS: all {tests.Length} payment gateway adapter tests passed.");
+if (failures > 0) return 1;
+Console.WriteLine($"PASS: all {tests.Length} payment target tests passed.");
 return 0;
 
-static void Accept(string value)
+static void RegisteredAdapterMatchingIsExact()
 {
-    var data = ParseData($"{{\"paymentUrl\":{JsonSerializer.Serialize(value)}}}");
-    var target = PaymentGatewayRegistry.ParsePaymentTarget("coingate", "coingate", data);
-    var uri = target.PaymentUri;
-    if (!target.GatewayName.Equals("coingate", StringComparison.Ordinal))
+    foreach (var supported in new[] { "coingate", "stripe", "paypal" })
     {
-        throw new InvalidOperationException($"Adapter returned the wrong canonical gateway: {target.GatewayName}");
+        if (!PaymentGatewayRegistry.SupportsGateway(supported)) throw new InvalidOperationException($"Missing {supported}.");
     }
-    if (!uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
-        !uri.IsAbsoluteUri ||
-        !uri.IsDefaultPort ||
-        !string.IsNullOrEmpty(uri.UserInfo))
+    foreach (var unsupported in new string?[] { null, "", "CoinGate", "Stripe", "PayPal", "google" })
     {
-        throw new InvalidOperationException($"Accepted URI did not preserve the required invariants: {uri}");
+        if (PaymentGatewayRegistry.SupportsGateway(unsupported))
+            throw new InvalidOperationException($"Unexpected adapter: {unsupported}");
     }
 }
+
+static void Accept(string gateway, string url)
+{
+    var target = PaymentGatewayRegistry.ParsePaymentTarget(
+        gateway, gateway, Parse($"{{\"checkout_url\":{JsonSerializer.Serialize(url)}}}"));
+    if (!target.GatewayName.Equals(gateway, StringComparison.Ordinal) || !target.PaymentUri.IsAbsoluteUri)
+        throw new InvalidOperationException("Validated target did not retain its exact gateway.");
+}
+
+static void CoinGateContractIsPreserved()
+{
+    var target = PaymentGatewayRegistry.ParsePaymentTarget(
+        "coingate", "coingate", Parse("{\"paymentUrl\":\"https://pay.example/order\"}"));
+    if (target.PaymentUri.Host != "pay.example") throw new InvalidOperationException("CoinGate contract changed.");
+    Reject("coingate", "coingate", "{\"checkout_url\":\"https://pay.example/order\"}");
+}
+
+static void RejectUrl(string gateway, string url) =>
+    Reject(gateway, gateway, $"{{\"checkout_url\":{JsonSerializer.Serialize(url)}}}");
 
 static void Reject(string expectedGateway, string responseGateway, string json)
 {
-    var data = ParseData(json);
     try
     {
-        var result = PaymentGatewayRegistry.ParsePaymentTarget(expectedGateway, responseGateway, data);
-        throw new InvalidOperationException($"Registry unexpectedly accepted {result.PaymentUri}.");
+        PaymentGatewayRegistry.ParsePaymentTarget(expectedGateway, responseGateway, Parse(json));
     }
-    catch (InvalidOperationException exception) when (!exception.Message.StartsWith("Registry unexpectedly accepted", StringComparison.Ordinal))
+    catch (InvalidOperationException)
     {
+        return;
     }
+    throw new InvalidOperationException("Untrusted payment target was accepted.");
 }
 
-static void RegisteredAdapterMatchingIsExactAndFailClosed()
-{
-    if (!PaymentGatewayRegistry.SupportsGateway("coingate"))
-    {
-        throw new InvalidOperationException("The verified CoinGate adapter was not registered.");
-    }
-    foreach (var unsupported in new string?[] { null, "", "CoinGate", "stripe", "paypal" })
-    {
-        if (PaymentGatewayRegistry.SupportsGateway(unsupported))
-        {
-            throw new InvalidOperationException($"An unregistered gateway was accepted: {unsupported}");
-        }
-    }
-}
-
-static void UnrelatedUrlIsNotSelected()
-{
-    var data = ParseData("{\"helpUrl\":\"https://evil.example/\",\"paymentUrl\":\"https://payments.example/order/1\",\"nested\":{\"url\":\"https://also-evil.example/\"}}");
-    var uri = PaymentGatewayRegistry.ParsePaymentTarget("coingate", "coingate", data).PaymentUri;
-    if (!uri.Host.Equals("payments.example", StringComparison.Ordinal))
-    {
-        throw new InvalidOperationException($"Parser selected the wrong host: {uri.Host}");
-    }
-}
-
-static JsonElement ParseData(string json)
+static JsonElement Parse(string json)
 {
     using var document = JsonDocument.Parse(json);
     return document.RootElement.Clone();

@@ -9,16 +9,25 @@ $topUpCode = Get-Content (Join-Path $sourceRoot "TopUpWindow.xaml.cs") -Raw
 $gatewayAdapterContract = Get-Content (Join-Path $sourceRoot "IPaymentGatewayAdapter.cs") -Raw
 $gatewayRegistry = Get-Content (Join-Path $sourceRoot "PaymentGatewayRegistry.cs") -Raw
 $coinGateAdapter = Get-Content (Join-Path $sourceRoot "CoinGatePaymentGatewayAdapter.cs") -Raw
+$stripeAdapter = Get-Content (Join-Path $sourceRoot "StripePaymentGatewayAdapter.cs") -Raw
+$paypalAdapter = Get-Content (Join-Path $sourceRoot "PayPalPaymentGatewayAdapter.cs") -Raw
+$hostedAdapter = Get-Content (Join-Path $sourceRoot "HostedCheckoutPaymentGatewayAdapter.cs") -Raw
+$paymentContracts = Get-Content (Join-Path $sourceRoot "PaymentContracts.cs") -Raw
+$paymentJournal = Get-Content (Join-Path $sourceRoot "PaymentJournalStore.cs") -Raw
+$orderValidator = Get-Content (Join-Path $sourceRoot "PaymentOrderValidator.cs") -Raw
 $paymentUriValidator = Get-Content (Join-Path $sourceRoot "PaymentUriValidator.cs") -Raw
 $paymentTarget = Get-Content (Join-Path $sourceRoot "PaymentTarget.cs") -Raw
-$paymentCode = $gatewayAdapterContract + $gatewayRegistry + $coinGateAdapter + $paymentUriValidator + $paymentTarget
+$paymentCode = $gatewayAdapterContract + $gatewayRegistry + $coinGateAdapter + $stripeAdapter + $paypalAdapter +
+    $hostedAdapter + $paymentContracts + $paymentJournal + $orderValidator + $paymentUriValidator + $paymentTarget
 $windowCode = Get-Content (Join-Path $sourceRoot "MainWindow.xaml.cs") -Raw
 $topUp = Get-Content (Join-Path $sourceRoot "TopUpWindow.xaml") -Raw
 
 $backendContracts = @(
     'identities/{Uri.EscapeDataString(identityId)}/balance/refresh',
     'v2/payment-order-gateways?options_currency=MYST',
-    'v2/identities/{Uri.EscapeDataString(identityId)}/{Uri.EscapeDataString(gateway.Name)}/payment-order',
+    'v2/payment-order-gateways?options_currency=USD',
+    'v2/identities/{Uri.EscapeDataString(identityId)}/{Uri.EscapeDataString(adapter.GatewayName)}/payment-order',
+    'v2/identities/{Uri.EscapeDataString(identityId)}/payment-order',
     'proposals?service_type=wireguard&access_policy=all',
     'kill_switch = true',
     'include_monitoring_failed = true'
@@ -84,9 +93,9 @@ if (-not $windowCode.Contains('registrationReady') -or
 }
 
 foreach ($needle in @(
-        'if (!PaymentGatewayRegistry.SupportsGateway(gateway.Name))',
-        'PaymentGatewayRegistry.SupportsGateway(g.Name)',
-        'GetPaymentTarget(gateway.Name)')) {
+        'PaymentGatewayRegistry.GetAdapter(gateway.Name)',
+        'PaymentGatewayRegistry.IntersectDiscoveredGateways(',
+        'order.GetPaymentTarget(adapter.GatewayName)')) {
     if (-not ($backend + $topUpCode).Contains($needle)) {
         throw "Gateway-bound payment target control missing: $needle"
     }
@@ -98,10 +107,16 @@ foreach ($forbidden in @('FindUri(', 'GetRawText()')) {
 }
 foreach ($needle in @('IPaymentGatewayAdapter',
         '[CoinGatePaymentGatewayAdapter.CanonicalGatewayName] = new CoinGatePaymentGatewayAdapter()',
+        '[StripePaymentGatewayAdapter.CanonicalGatewayName] = new StripePaymentGatewayAdapter()',
+        '[PayPalPaymentGatewayAdapter.CanonicalGatewayName] = new PayPalPaymentGatewayAdapter()',
         'new Dictionary<string, IPaymentGatewayAdapter>(StringComparer.Ordinal)',
-        'Adapters.TryGetValue(expectedGatewayName',
+        'var adapter = GetAdapter(expectedGatewayName);',
         'string.Equals(responseGatewayName, adapter.GatewayName, StringComparison.Ordinal)')) {
     if (-not $paymentCode.Contains($needle)) { throw "Payment gateway registry invariant missing: $needle" }
+}
+foreach ($needle in @('CheckoutUrlField = "checkout_url"', 'matchingFields != 1',
+        'checkout.stripe.com', 'www.paypal.com', 'CheckoutPath => "/checkoutnow"')) {
+    if (-not $paymentCode.Contains($needle)) { throw "Hosted checkout contract invariant missing: $needle" }
 }
 foreach ($needle in @('CanonicalGatewayName = "coingate"', 'PaymentUrlField = "paymentUrl"',
         'StringComparison.OrdinalIgnoreCase', 'property.NameEquals(PaymentUrlField)', 'matchingFields != 1')) {
@@ -117,10 +132,10 @@ if (-not $topUpCode.Contains('_paymentUri = null;') -or
         $topUpCode.IndexOf('_backend.CreatePaymentOrderAsync(', [StringComparison]::Ordinal)) {
     throw "A new payment-order attempt does not clear the previously validated target"
 }
-if ($topUpCode.IndexOf('CreatedOrder = order;', [StringComparison]::Ordinal) -lt
-        $topUpCode.IndexOf('order.GetPaymentTarget(gateway.Name);', [StringComparison]::Ordinal) -or
-    $topUpCode.IndexOf('_paymentUri = paymentTarget.PaymentUri;', [StringComparison]::Ordinal) -lt
-        $topUpCode.IndexOf('order.GetPaymentTarget(gateway.Name);', [StringComparison]::Ordinal)) {
+if ($topUpCode.IndexOf('CreatedOrder = created.Order;', [StringComparison]::Ordinal) -lt
+        $topUpCode.IndexOf('_backend.CreatePaymentOrderAsync(', [StringComparison]::Ordinal) -or
+    $topUpCode.IndexOf('_paymentUri = created.PaymentTarget.PaymentUri;', [StringComparison]::Ordinal) -lt
+        $topUpCode.IndexOf('_backend.CreatePaymentOrderAsync(', [StringComparison]::Ordinal)) {
     throw "Payment order state is committed before the gateway-bound target is validated"
 }
 
@@ -129,5 +144,8 @@ if ($LASTEXITCODE -ne 0) { throw "Payment target parser runtime tests failed wit
 
 dotnet run --project (Join-Path $root "tests\PrivacyBrowser.OperationFeedback.Tests\PrivacyBrowser.OperationFeedback.Tests.csproj") --configuration Release
 if ($LASTEXITCODE -ne 0) { throw "Operation feedback runtime tests failed with code $LASTEXITCODE" }
+
+dotnet run --project (Join-Path $root "tests\PrivacyBrowser.PaymentLifecycle.Tests\PrivacyBrowser.PaymentLifecycle.Tests.csproj") --configuration Release
+if ($LASTEXITCODE -ne 0) { throw "Payment lifecycle runtime tests failed with code $LASTEXITCODE" }
 
 Write-Host "PASS: resilient backend state, wallet/payment, provider discovery, native controls, and friendly errors are present."

@@ -161,6 +161,18 @@ public sealed class TokenAmount
 
     [JsonIgnore]
     public string Display => Value == 0m ? "0" : Value.ToString("0.####", CultureInfo.InvariantCulture);
+
+    public static decimal FromWei(string wei)
+    {
+        if (!PaymentBalanceEvidence.TryParseWei(wei, out var amount)) return 0m;
+        var text = amount.ToString(CultureInfo.InvariantCulture).PadLeft(19, '0');
+        var whole = text[..^18];
+        var fraction = text[^18..].TrimEnd('0');
+        var ether = fraction.Length == 0 ? whole : $"{whole}.{fraction}";
+        return decimal.TryParse(ether, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : 0m;
+    }
 }
 
 public sealed class ProposalList
@@ -256,10 +268,21 @@ public sealed class PaymentGateway
     public PaymentOrderOptions OrderOptions { get; set; } = new();
 
     [JsonPropertyName("currencies")]
-    public List<string> Currencies { get; set; } = [];
+    public List<string>? Currencies { get; set; } = [];
 
     [JsonIgnore]
-    public string DisplayName => Name.Replace('_', ' ');
+    public string DisplayName => PaymentGatewayRegistry.SupportsGateway(Name)
+        ? PaymentGatewayRegistry.GetAdapter(Name).DisplayName
+        : Name.Replace('_', ' ');
+
+    [JsonIgnore]
+    public string AmountCurrency => PaymentGatewayRegistry.GetAdapter(Name).AmountCurrency;
+
+    [JsonIgnore]
+    public decimal EffectiveMinimum => PaymentGatewayRegistry.GetAdapter(Name).EffectiveMinimum(this);
+
+    [JsonIgnore]
+    public IReadOnlyList<decimal> SuggestedAmounts => PaymentGatewayRegistry.GetAdapter(Name).SuggestedAmounts(this);
 }
 
 public sealed class PaymentOrderOptions
@@ -268,7 +291,7 @@ public sealed class PaymentOrderOptions
     public decimal Minimum { get; set; }
 
     [JsonPropertyName("suggested")]
-    public List<decimal> Suggested { get; set; } = [];
+    public List<decimal>? Suggested { get; set; } = [];
 }
 
 public sealed class PaymentOrder
@@ -278,6 +301,9 @@ public sealed class PaymentOrder
 
     [JsonPropertyName("status")]
     public string Status { get; set; } = "";
+
+    [JsonPropertyName("identity")]
+    public string Identity { get; set; } = "";
 
     [JsonPropertyName("gateway_name")]
     public string GatewayName { get; set; } = "";

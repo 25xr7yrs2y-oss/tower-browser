@@ -46,6 +46,9 @@ jobs:
       - name: Validate backend controls and wallet workflow
         shell: powershell
         run: .\tests\Test-BackendControls.ps1
+      - name: Validate hosted payment security invariants
+        shell: powershell
+        run: .\tests\Test-PaymentSecurity.ps1
       - name: Validate backend deadlines and connection reconciliation
         shell: powershell
         run: dotnet run --project .\tests\PrivacyBrowser.BackendController.Tests\PrivacyBrowser.BackendController.Tests.csproj --configuration Release
@@ -74,12 +77,12 @@ jobs:
       - name: Upload native application
         uses: actions/upload-artifact@v4
         with:
-          name: PrivacyBrowser-1.0.7-windows-x64-app
+          name: PrivacyBrowser-1.0.9-windows-x64-app
           path: app/
           if-no-files-found: error
       - name: Upload self-contained QA application
         uses: actions/upload-artifact@v4
         with:
-          name: PrivacyBrowser-1.0.7-windows-x64-self-contained
+          name: PrivacyBrowser-1.0.9-windows-x64-self-contained
           path: qa-app/
           if-no-files-found: error

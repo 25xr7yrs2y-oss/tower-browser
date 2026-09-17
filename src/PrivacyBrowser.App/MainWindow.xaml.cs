@@ -32,7 +32,7 @@ public partial class MainWindow : Window
         _options = options;
         _stateStore = new UserStateStore(options.BundleRoot);
         _selectedIdentityId = _stateStore.LoadSelectedIdentityId();
-        var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.7";
+        var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.9";
         Title = $"Privacy Browser {version}";
         _backend = new BackendController(options);
         _browser = new BrowserLauncher(options, _backend);

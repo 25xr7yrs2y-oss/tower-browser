@@ -46,9 +46,12 @@ public sealed class BackendController : IAsyncDisposable
     private readonly TimeProvider _timeProvider;
     private readonly Func<TimeSpan, CancellationToken, Task> _delay;
     private readonly Func<bool>? _connectedStateVerifier;
+    private readonly PaymentJournalStore _paymentJournal;
+    private readonly SemaphoreSlim _paymentCreation = new(1, 1);
     private Process? _process;
     private bool _stopping;
     private bool _connectOutcomeIndeterminate;
+    private bool _paymentCreationOutcomeUnresolved;
 
     public BackendController(AppOptions options)
         : this(options, new SocketsHttpHandler { UseProxy = false }, BackendTimeouts.Default)
@@ -68,6 +71,7 @@ public sealed class BackendController : IAsyncDisposable
         _timeProvider = timeProvider ?? TimeProvider.System;
         _delay = delay ?? ((duration, token) => Task.Delay(duration, _timeProvider, token));
         _connectedStateVerifier = connectedStateVerifier;
+        _paymentJournal = new PaymentJournalStore(options.BundleRoot);
         _client = new HttpClient(handler)
         {
             BaseAddress = new Uri($"http://127.0.0.1:{ControlPort}/"),
@@ -311,54 +315,191 @@ public sealed class BackendController : IAsyncDisposable
 
     public async Task<IReadOnlyList<PaymentGateway>> GetPaymentGatewaysAsync(CancellationToken cancellationToken = default)
     {
-        var gateways = await GetAsync<List<PaymentGateway>>(BackendOperation.PaymentGatewayDiscovery,
+        var mystGatewaysTask = GetAsync<List<PaymentGateway>>(BackendOperation.PaymentGatewayDiscovery,
             "v2/payment-order-gateways", "v2/payment-order-gateways?options_currency=MYST",
             _timeouts.Ordinary, cancellationToken);
-        return gateways
-            .Where(g => PaymentGatewayRegistry.SupportsGateway(g.Name) && g.Currencies.Count > 0)
-            .ToArray();
+        var usdGatewaysTask = GetAsync<List<PaymentGateway>>(BackendOperation.PaymentGatewayDiscovery,
+            "v2/payment-order-gateways", "v2/payment-order-gateways?options_currency=USD",
+            _timeouts.Ordinary, cancellationToken);
+        await Task.WhenAll(mystGatewaysTask, usdGatewaysTask);
+        return PaymentGatewayRegistry.IntersectDiscoveredGateways(
+            mystGatewaysTask.Result, usdGatewaysTask.Result);
     }
 
-    public async Task<PaymentOrder> CreatePaymentOrderAsync(
+    public async Task<CreatedPaymentOrder> CreatePaymentOrderAsync(
         string identityId,
         PaymentGateway gateway,
-        decimal mystAmount,
-        string currency,
+        string amountText,
+        string payCurrency,
         string country,
         string state,
         CancellationToken cancellationToken = default)
     {
-        if (!PaymentGatewayRegistry.SupportsGateway(gateway.Name))
+        await _paymentCreation.WaitAsync(cancellationToken);
+        try
         {
-            throw new InvalidOperationException("The selected payment gateway is not supported.");
+            if (!PaymentIdentity.IsValid(identityId))
+            {
+                throw new InvalidOperationException("The selected payment identity is invalid.");
+            }
+            if (_paymentCreationOutcomeUnresolved)
+            {
+                throw new PaymentOrderAmbiguousException();
+            }
+
+            var adapter = PaymentGatewayRegistry.GetAdapter(gateway.Name);
+            if (gateway.Currencies is null || !gateway.Currencies.Contains(payCurrency, StringComparer.Ordinal))
+            {
+                throw new InvalidOperationException($"{gateway.DisplayName} does not accept {payCurrency}.");
+            }
+
+            var requestedAmount = adapter.ParseAndFormatAmount(amountText);
+            var amount = decimal.Parse(requestedAmount, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture);
+            if (!adapter.IsAmountAllowed(amount, gateway))
+            {
+                var relation = gateway.Name == CoinGatePaymentGatewayAdapter.CanonicalGatewayName ? "more than" : "at least";
+                throw new InvalidOperationException(
+                    $"The amount must be {relation} {adapter.EffectiveMinimum(gateway):0.00} {adapter.AmountCurrency}.");
+            }
+
+            var location = PaymentLocation.Validate(country, state);
+            var existingJournal = _paymentJournal.Load();
+            if (existingJournal is not null && !PaymentStatus.IsTerminal(existingJournal.LastStatus))
+            {
+                throw new InvalidOperationException(
+                    $"Payment order {existingJournal.OrderId} is still {PaymentStatus.Display(existingJournal.LastStatus).ToLowerInvariant()}. " +
+                    "Only one active payment order is permitted.");
+            }
+
+            var baseline = await RefreshBalanceAsync(identityId, cancellationToken);
+            if (!PaymentBalanceEvidence.TryParseWei(baseline.BalanceTokens.Wei, out _))
+            {
+                throw new InvalidOperationException("The baseline wallet balance was invalid; no payment order was created.");
+            }
+
+            // Listing before POST is mandatory: it makes a timed-out/transport-ambiguous
+            // request reconcilable without ever repeating the state-changing request.
+            var before = await GetPaymentOrdersAsync(identityId, cancellationToken);
+            var beforeIds = before.Where(order => !string.IsNullOrEmpty(order.Id))
+                .Select(order => order.Id).ToHashSet(StringComparer.Ordinal);
+            var intent = new PaymentOrderIntent(
+                identityId, adapter.GatewayName, requestedAmount, adapter.AmountCurrency, payCurrency);
+            var request = adapter.BuildRequest(
+                requestedAmount, payCurrency, location.Country, location.State);
+
+            PaymentOrder order;
+            _paymentCreationOutcomeUnresolved = true;
+            try
+            {
+                order = await SendAsync<PaymentOrder>(BackendOperation.PaymentOrderCreate, HttpMethod.Post,
+                    "v2/identities/{identity}/{gateway}/payment-order",
+                    $"v2/identities/{Uri.EscapeDataString(identityId)}/{Uri.EscapeDataString(adapter.GatewayName)}/payment-order",
+                    request, _timeouts.Ordinary, cancellationToken);
+            }
+            catch (Exception exception) when (exception is BackendOperationTimeoutException or
+                                               BackendCallerCanceledException or HttpRequestException)
+            {
+                order = await ReconcilePaymentOrderAsync(identityId, intent, beforeIds);
+            }
+            catch
+            {
+                _paymentCreationOutcomeUnresolved = false;
+                throw;
+            }
+
+            adapter.ValidateOrder(order, intent);
+            var target = order.GetPaymentTarget(adapter.GatewayName);
+            var now = DateTimeOffset.UtcNow;
+            var journal = new PaymentJournalEntry(
+                identityId,
+                adapter.GatewayName,
+                order.Id,
+                requestedAmount,
+                adapter.AmountCurrency,
+                payCurrency,
+                order.ReceiveMyst,
+                baseline.BalanceTokens.Wei,
+                now,
+                now,
+                order.Status);
+            _paymentJournal.Save(journal);
+            _paymentCreationOutcomeUnresolved = false;
+            return new CreatedPaymentOrder(order, target, journal);
         }
-        if (mystAmount <= 0) throw new ArgumentOutOfRangeException(nameof(mystAmount), "Top-up amount must be greater than zero.");
-        if (gateway.OrderOptions.Minimum > 0 && mystAmount <= gateway.OrderOptions.Minimum)
+        finally
         {
-            throw new ArgumentOutOfRangeException(nameof(mystAmount),
-                $"Top-up amount must be greater than {gateway.OrderOptions.Minimum:0.####} MYST.");
+            _paymentCreation.Release();
         }
-        if (!gateway.Currencies.Contains(currency, StringComparer.OrdinalIgnoreCase))
+    }
+
+    public PaymentJournalEntry? GetPaymentJournal() => _paymentJournal.Load();
+
+    public void ClearTerminalPayment() => _paymentJournal.ClearTerminal();
+
+    public async Task<IReadOnlyList<PaymentOrder>> GetPaymentOrdersAsync(
+        string identityId,
+        CancellationToken cancellationToken = default)
+    {
+        return await GetAsync<List<PaymentOrder>>(BackendOperation.PaymentOrderList,
+            "v2/identities/{identity}/payment-order",
+            $"v2/identities/{Uri.EscapeDataString(identityId)}/payment-order",
+            _timeouts.Ordinary, cancellationToken);
+    }
+
+    public async Task<PaymentOrder> GetPaymentOrderAsync(
+        string identityId,
+        string orderId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(orderId) || orderId.Length > 200)
         {
-            throw new InvalidOperationException($"{gateway.DisplayName} does not accept {currency}.");
+            throw new InvalidOperationException("The payment order ID is invalid.");
         }
-        if (country.Length != 2) throw new InvalidOperationException("Country must be a two-letter code, such as US or DE.");
-        if (!string.IsNullOrWhiteSpace(state) && state.Length != 2)
+        return await GetAsync<PaymentOrder>(BackendOperation.PaymentOrderGet,
+            "v2/identities/{identity}/payment-order/{order_id}",
+            $"v2/identities/{Uri.EscapeDataString(identityId)}/payment-order/{Uri.EscapeDataString(orderId)}",
+            _timeouts.Ordinary, cancellationToken);
+    }
+
+    public async Task<PaymentStatusSnapshot> PollPaymentOrderAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var journal = _paymentJournal.Load()
+            ?? throw new InvalidOperationException("No resumable payment order exists.");
+        var intent = new PaymentOrderIntent(
+            journal.Identity, journal.Gateway, journal.RequestedAmount, journal.AmountCurrency, journal.PayCurrency);
+        var adapter = PaymentGatewayRegistry.GetAdapter(journal.Gateway);
+        var order = await GetPaymentOrderAsync(journal.Identity, journal.OrderId, cancellationToken);
+        adapter.ValidateOrder(order, intent);
+        if (!PaymentAmount.TryParseResponseAmount(order.ReceiveMyst, out var observedMyst) ||
+            !PaymentAmount.TryParseResponseAmount(journal.ExpectedMyst, out var expectedMyst) ||
+            observedMyst != expectedMyst)
         {
-            throw new InvalidOperationException("State must be a two-letter code or left blank.");
+            throw new InvalidOperationException("The resumed payment order did not match the recorded receive amount.");
         }
 
-        return await SendAsync<PaymentOrder>(BackendOperation.PaymentOrderCreate, HttpMethod.Post,
-            "v2/identities/{identity}/{gateway}/payment-order",
-            $"v2/identities/{Uri.EscapeDataString(identityId)}/{Uri.EscapeDataString(gateway.Name)}/payment-order",
-            new
-            {
-                myst_amount = mystAmount.ToString(CultureInfo.InvariantCulture),
-                pay_currency = currency.ToUpperInvariant(),
-                country = country.ToUpperInvariant(),
-                state = state.ToUpperInvariant(),
-                gateway_caller_data = new { },
-            }, _timeouts.Ordinary, cancellationToken);
+        // Order status and wallet credit are independent facts. Refresh the wallet
+        // even for unknown/pending states so an observed credit is never inferred.
+        var balance = await RefreshBalanceAsync(journal.Identity, cancellationToken);
+        if (!PaymentBalanceEvidence.TryParseWei(balance.BalanceTokens.Wei, out _))
+        {
+            throw new InvalidOperationException("The refreshed wallet balance was invalid.");
+        }
+        var observedAt = DateTimeOffset.UtcNow;
+        var updated = _paymentJournal.UpdateStatus(order.Status, observedAt);
+        var paid = PaymentStatus.IsPaid(order.Status);
+        var balanceIncreased = PaymentBalanceEvidence.HasIncreased(
+            balance.BalanceTokens.Wei, journal.BaselineBalanceWei);
+        return new PaymentStatusSnapshot(
+            order,
+            updated,
+            PaymentStatus.Display(order.Status),
+            paid,
+            balanceIncreased,
+            TokenAmount.FromWei(journal.BaselineBalanceWei),
+            balance.BalanceTokens.Value,
+            paid && balanceIncreased,
+            observedAt);
     }
 
     public async Task ConnectAsync(
@@ -502,6 +643,7 @@ public sealed class BackendController : IAsyncDisposable
     {
         await StopAsync();
         _client.Dispose();
+        _paymentCreation.Dispose();
     }
 
     internal async Task WaitUntilReadyAsync(CancellationToken cancellationToken)
@@ -673,6 +815,33 @@ public sealed class BackendController : IAsyncDisposable
             "connection?id={proxy_port}", ConnectionPath, _timeouts.Ordinary, cancellationToken);
         ObserveConnectionState(connection);
         return connection;
+    }
+
+    private async Task<PaymentOrder> ReconcilePaymentOrderAsync(
+        string identityId,
+        PaymentOrderIntent intent,
+        IReadOnlySet<string> beforeIds)
+    {
+        try
+        {
+            var candidates = (await GetPaymentOrdersAsync(identityId, CancellationToken.None))
+                .Where(order => !beforeIds.Contains(order.Id))
+                .Where(order => PaymentOrderValidator.IsExactIntentMatch(order, intent))
+                .ToArray();
+            if (candidates.Length == 1)
+            {
+                return candidates[0];
+            }
+        }
+        catch (PaymentOrderAmbiguousException)
+        {
+            throw;
+        }
+        catch
+        {
+            // A failed reconciliation cannot prove whether the POST created an order.
+        }
+        throw new PaymentOrderAmbiguousException();
     }
 
     private void ResolveIndeterminateConnect(ConnectionInfo state, bool priorAttempt)

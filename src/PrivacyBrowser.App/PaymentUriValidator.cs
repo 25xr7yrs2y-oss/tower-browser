@@ -4,6 +4,16 @@ public static class PaymentUriValidator
 {
     public static Uri ParseAbsoluteHttps(string value)
     {
+        return Parse(value, exactHost: null, exactPath: null);
+    }
+
+    public static Uri ParseHostedCheckout(string value, string exactHost, string? exactPath = null)
+    {
+        return Parse(value, exactHost, exactPath);
+    }
+
+    private static Uri Parse(string value, string? exactHost, string? exactPath)
+    {
         if (string.IsNullOrEmpty(value))
         {
             throw new InvalidOperationException("The payment response contained an empty payment URL.");
@@ -15,9 +25,9 @@ public static class PaymentUriValidator
                 throw new InvalidOperationException("The payment URL contained whitespace or control characters.");
             }
         }
-        if (value.Contains('#'))
+        if (value.Contains('#') || value.Contains('\\'))
         {
-            throw new InvalidOperationException("The payment URL must not contain a fragment.");
+            throw new InvalidOperationException("The payment URL contained a forbidden fragment or path separator.");
         }
         if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
             !uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
@@ -32,6 +42,16 @@ public static class PaymentUriValidator
         if (HasExplicitEmptyPort(value) || !uri.IsDefaultPort)
         {
             throw new InvalidOperationException("The payment URL must use the default HTTPS port.");
+        }
+        if (exactHost is not null &&
+            !uri.DnsSafeHost.Equals(exactHost, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("The payment URL host is not approved for this gateway.");
+        }
+        if (exactPath is not null &&
+            !uri.AbsolutePath.Equals(exactPath, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("The payment URL path is not approved for this gateway.");
         }
 
         return uri;

@@ -4,10 +4,10 @@
 from __future__ import annotations
 
 import argparse
-import shutil
+import io
 from pathlib import Path
 
-from PIL import Image, ImageFilter
+from PIL import Image, ImageCms, ImageFilter, ImageOps
 
 
 PNG_SIZES = (16, 20, 24, 32, 40, 48, 64, 128, 256, 512)
@@ -24,20 +24,31 @@ def main() -> None:
     png_dir = args.output / "Icons"
     png_dir.mkdir(parents=True, exist_ok=True)
 
-    approved_source = args.output / "OfficialIconSource.png"
-    if args.source.resolve() != approved_source.resolve():
-        shutil.copy2(args.source, approved_source)
     with Image.open(args.source) as source:
         source.load()
-        rgb = source.convert("RGB")
-        square = min(rgb.width, rgb.height)
+        oriented = ImageOps.exif_transpose(source)
+        if oriented.width != oriented.height:
+            raise ValueError(
+                f"Icon source must be square; received {oriented.width}x{oriented.height}."
+            )
 
-        # The approved portrait is almost square. Crop only the lower surplus,
-        # keeping the face, hair, and gesture intact without stretching pixels.
-        left = (rgb.width - square) // 2
-        top = 0
-        cropped = rgb.crop((left, top, left + square, top + square))
-        master = cropped.resize((1024, 1024), Image.Resampling.LANCZOS)
+        rgb = oriented.convert("RGB")
+        embedded_profile = source.info.get("icc_profile")
+        if embedded_profile:
+            rgb = ImageCms.profileToProfile(
+                rgb,
+                ImageCms.getOpenProfile(io.BytesIO(embedded_profile)),
+                ImageCms.createProfile("sRGB"),
+                outputMode="RGB",
+            )
+
+        # Saving decoded pixels as PNG intentionally strips EXIF and other
+        # source metadata. Pixel values have already been normalized to sRGB;
+        # clearing Pillow's generated profile also avoids its timestamp making
+        # otherwise identical PNG output change between runs.
+        rgb.info.clear()
+        master = rgb
+        master.save(args.output / "OfficialIconSource.png", format="PNG", optimize=True)
         master.save(args.output / "IconMaster.png", format="PNG", optimize=True)
 
         for size in PNG_SIZES:
