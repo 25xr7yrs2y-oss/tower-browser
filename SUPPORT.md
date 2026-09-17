@@ -2,8 +2,8 @@
 
 ## Release support
 
-- **v1.0.10:** supported stable line after its release is published.
-- **v1.0.9:** supported validated baseline until v1.0.10 is published.
+- **v1.0.10:** current supported stable release.
+- **v1.0.9:** historical validated baseline; no longer supported.
 - **v1.0.0-v1.0.8:** archived, unsupported historical test builds.
 
 Support means repository maintenance and consideration of reproducible defects;

@@ -48,7 +48,7 @@ public partial class MainWindow : Window
         });
         _browser.BrowserExited += processId => Dispatcher.BeginInvoke(() =>
         {
-            AppendActivity($"Privacy browser process {processId} exited.");
+            AppendActivity($"Tower Browser process {processId} exited.");
             RenderBrowserReadiness();
             UpdateControls();
         });
@@ -317,9 +317,9 @@ public partial class MainWindow : Window
         try
         {
             Process process = _browser.Launch(_snapshot);
-            AppendActivity($"Privacy browser started as process {process.Id}.");
+            AppendActivity($"Tower Browser started as process {process.Id}.");
             PublishFeedback(OperationFeedbackArea.BrowserAndDiagnostics, OperationFeedbackKind.Success,
-                "Privacy browser launched.");
+                "Tower Browser launched.");
             RenderBrowserReadiness();
             UpdateControls();
         }
