@@ -1,0 +1,45 @@
+name: Bug report
+description: Report a reproducible, non-sensitive Tower Browser defect.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include credentials, identity keys, payment data, checkout URLs, tokens, or vulnerability details.
+  - type: input
+    id: version
+    attributes:
+      label: Tower Browser version
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and sanitized logs
+    validations:
+      required: true
+  - type: checkboxes
+    id: sensitive
+    attributes:
+      label: Sensitive data check
+      options:
+        - label: I removed credentials, identity data, payment data, checkout URLs, tokens, and private paths.
+          required: true

@@ -1,32 +1,41 @@
-# tower Browser
+# Tower Browser
 
-Version 1.0.9 is a Windows x64 testing release combining a native .NET/WPF control application,
-an unpacked Mullvad Browser, and the `custom-proxy-build` Myst node from
-`myst-lmprove`. It does not modify the Windows system proxy, DNS servers,
+Tower Browser is a Windows x64 prototype that combines a native .NET 8/WPF
+controller, an unpacked Mullvad Browser, and the pinned `custom-proxy-build`
+Myst node from `myst-lmprove`. It routes only the bundled browser through a
+loopback HTTP/CONNECT proxy; it does not change the Windows system proxy, DNS,
 firewall, or route table.
 
-## Status
+## Project status and support
 
-The native integration and portable release packaging are implemented. Version 1.0.9 replaces the Windows executable,
-shortcut, taskbar, and WPF window icon with the supplied brown, black-silhouette, and Eiffel Tower artwork. It otherwise retains
-the 1.0.8 Mysterium-hosted Stripe card and PayPal top-ups, the explicit per-operation deadlines and safe reconciliation introduced
-in 1.0.5, the pinned backend's proxy-mode route/supervisor isolation, and app-owned connection ID 4449 handling. The payment-target,
-navigation, identity, readiness,
-browser-process, and bundle-integrity hardening
-from earlier versions remains in place. Packet capture confirms browser payload
-routing through the loopback backend and a Mysterium provider, no direct
-browser TCP/DNS/UDP path, fail-closed behavior before launch and after backend
-termination, and unaffected external `curl`/PowerShell traffic. Code signing,
-reboot, and true standard-user validation gaps remain. See
-`docs/VALIDATION_RESULTS.md`.
+Version 1.0.10 is the normalized stable release line. Until its tag and release
+are published, v1.0.9 remains the validated baseline. Versions v1.0.0-v1.0.8
+are archived, unsupported test builds. See [SUPPORT.md](SUPPORT.md),
+[CHANGELOG.md](CHANGELOG.md), and the
+[GitHub releases page](https://github.com/25xr7yrs2y-oss/tower-browser/releases).
+
+Tower Browser remains an unsigned prototype, not a claim of production
+readiness. Windows CI builds and smoke-starts the WPF app and validates source,
+policy, packaging, checksum, and selected security invariants. Clean-machine
+standard-user, reboot, firewall-product, code-signing, fresh native packet
+capture, and production payment validation remain incomplete. Read
+[docs/VALIDATION_RESULTS.md](docs/VALIDATION_RESULTS.md) before relying on a
+security or privacy claim.
+
+## Supported platform
+
+- Windows x64
+- .NET 8 SDK for source builds; release packages are self-contained
+- PowerShell 7 for the release tooling
+
+Other operating systems are not supported runtime targets.
 
 ## Architecture
 
 ```text
-PrivacyBrowser.exe (native WPF window)
-  -> in-process BackendController
-  -> starts myst.exe directly with its web UI disabled
-  -> Myst TequilAPI control endpoint at 127.0.0.1:44050
+TowerBrowser.exe (native WPF controller)
+  -> starts the pinned myst.exe with its web UI disabled
+  -> controls Myst through loopback TequilAPI at 127.0.0.1:44050
 
 Mullvad Browser (isolated profile)
   -> locked HTTP/HTTPS proxy policy at 127.0.0.1:4449
@@ -34,31 +43,38 @@ Mullvad Browser (isolated profile)
   -> selected Mysterium provider
   -> Internet
 
-myst-lmprove control-plane connections -> direct Internet (allowed and recorded)
-all other Windows applications          -> unchanged Windows network path
+all other Windows applications -> unchanged Windows network path
 ```
 
-The application does not start the Electron `MysteriumVPN.exe` shell, does not
-start or browse to `127.0.0.1:44051`, and does not host HTML for UI control.
-WPF event handlers call an in-process controller; only the existing Myst daemon
-control contract on `44050` remains. Port `4449` remains intentionally because
-it is the browser's data-plane proxy, not a UI transport. See
-`docs/NATIVE_UI_ARCHITECTURE.md` for the migration analysis and trust boundary.
+The browser has no direct-fallback proxy configuration. If the backend is not
+ready or disappears, browser requests continue targeting the dead loopback
+endpoint. DNS prefetch, speculative connections, DNS-over-HTTPS, and WebRTC are
+locked off. Backend control, discovery, identity, payment, and provider traffic
+is separate direct control-plane traffic and is inside the trust boundary.
 
-Portable packages include `bundle-manifest.json`. Before backend startup, the
-application verifies the release version, size, and SHA-256 of the controller,
-browser, locked policy, and Myst backend. This detects incomplete or mixed
-extractions; the published archive checksum remains the authenticity boundary.
+See [docs/NATIVE_UI_ARCHITECTURE.md](docs/NATIVE_UI_ARCHITECTURE.md) and
+[docs/IMPLEMENTATION_NOTES.md](docs/IMPLEMENTATION_NOTES.md).
 
-The browser never receives a direct-fallback proxy configuration. If the
-backend disappears, Firefox requests continue targeting the dead loopback
-endpoint and fail closed. DNS prefetch, speculative connections, DNS-over-HTTPS,
-and WebRTC are locked off. Mullvad Browser's anti-fingerprinting defaults are
-retained and several core settings are locked on.
+## Download and run
 
-## Layout
+Download the current portable ZIP and matching SHA-256 manifest from
+[GitHub Releases](https://github.com/25xr7yrs2y-oss/tower-browser/releases).
+Verify the ZIP against the published manifest, extract it to a user-writable
+directory, and run `TowerBrowser.exe` from the extracted top-level folder.
 
-Place unpacked dependencies under `vendor`:
+The package is unsigned, so Windows may display an unknown-publisher warning.
+Do not download release executables from mirrors. The archive checksum is the
+current authenticity boundary; `bundle-manifest.json` detects missing or mixed
+critical files after extraction but is not a code signature.
+
+The upper-right **Controls** panel manages terms, identity, wallet balance,
+top-up creation, provider discovery, connection, and isolated-browser launch.
+Provider availability, identity registration, payment checkout, and wallet
+credit depend on external Mysterium services.
+
+## Build and run from source
+
+Place unpacked runtime dependencies at:
 
 ```text
 vendor/
@@ -66,94 +82,24 @@ vendor/
   myst-lmprove/resources/app.asar.unpacked/node_modules/@mysteriumnetwork/node/bin/win/x64/myst.exe
 ```
 
-Other layouts can be supplied with launcher parameters.
-
-The portable package downloads the trusted workflow's pinned raw `myst.exe`.
-It does not include or run the `myst-lmprove` Electron installer and does not
-install `MysteriumVPNSupervisor`. Proxy mode is isolated from the supervisor and
-host routing at both the P2P call site and routing-manager selection.
-
-## Build
-
-Build the native Windows application with the .NET 8 SDK:
+Then run:
 
 ```powershell
 .\Build.ps1
+.\Start-TowerBrowser.ps1
 ```
 
-This publishes the WPF app to `app\PrivacyBrowser.exe`. Use
-`-SelfContained` if the target machine does not have the .NET 8 Desktop Runtime.
-
-The executable embeds the official multi-resolution Windows icon and reports
-file/product version `1.0.9`. The native WPF window uses the matching embedded
-PNG resource so Windows Imaging Component can decode it reliably at startup.
-
-## Release package
-
-Maintainers can build the complete self-contained Windows x64 bundle with:
-
-```powershell
-$env:MYST_RELEASE_TOKEN = "<token with read access to the pinned backend release>"
-.\Package-Release.ps1
-.\tests\Test-ReleasePackage.ps1
-```
-
-This creates `PrivacyBrowser-1.0.9-windows-x64-portable.zip`, its SHA-256
-manifest, and the corresponding `myst-lmprove` source archive. The upstream
-installers are downloaded at pinned hashes and extracted; they are never run.
-
-## Run
-
-From a source/development checkout:
-
-```powershell
-.\Start-PrivacyBrowser.ps1
-```
-
-For the release package, extract the ZIP to a user-writable directory and
-double-click `PrivacyBrowser.exe` in the extracted top-level folder.
-
-The userspace proxy path is intended to work without elevation, but the live
-provider run used Administrator and the upstream installer requires elevation.
-A genuine standard-user run remains a validation gap.
-
-The application opens its own native window. Its overview shows backend,
-identity, wallet, provider, and browser-readiness state at a glance. Use the
-**Controls** button in the upper-right to:
-
-- accept consumer terms and create/register an identity;
-- create a passphrase-protected identity or import an existing encrypted key;
-- explicitly select among identities and retry unlock credentials securely;
-- view and refresh the identity's MYST balance;
-- create a top-up through the intersection of gateways reported by Myst and
-  explicitly registered client adapters: CoinGate, credit/debit card (Stripe),
-  and PayPal;
-- discover, search, inspect, and select WireGuard providers;
-- connect, disconnect, and launch the isolated browser;
-- restart an owned backend after failure; and
-- see operation progress, results, prerequisite guidance, and friendly errors.
-
-The browser launch button is enabled only after one composite readiness check
-verifies the `CONNECTED` state, expected backend ownership of the loopback
-proxy listener, browser executable, and locked policy. The same check runs
-again at launch. Payment checkout, provider availability,
-and identity registration still depend on Mysterium's external services.
-
-Use `-KeepBackendRunning` only for debugging; by default the native application
-owns and cleans up the `myst.exe` process it started. Use `-SkipBackendLaunch`
-only for control-plane diagnostics against an already-running development
-backend on `127.0.0.1:44050`. Browser launch is disabled in this mode because
-proxy process ownership cannot be proven.
-
-## Install the policy
-
-The launcher verifies and installs `config/policies.json` into the unpacked
-browser's `distribution` directory before every launch. It refuses to replace
-an unrelated policy file. The policy affects only this browser tree.
+`Build.ps1` publishes the WPF application to `app\TowerBrowser.exe`.
+`Start-PrivacyBrowser.ps1` remains only as a compatibility shim for older local
+automation. `TOWER_BROWSER_ROOT` is the canonical development override;
+`PRIVACY_BROWSER_ROOT` remains a compatibility fallback.
 
 ## Tests
 
+On Windows with the .NET 8 SDK:
+
 ```powershell
+.\Build.ps1
 .\tests\Test-Configuration.ps1
 .\tests\Test-Launcher.ps1
 .\tests\Test-NativeArchitecture.ps1
@@ -161,39 +107,43 @@ an unrelated policy file. The policy affects only this browser tree.
 .\tests\Test-BackendControls.ps1
 .\tests\Test-PaymentSecurity.ps1
 dotnet run --project .\tests\PrivacyBrowser.BackendController.Tests\PrivacyBrowser.BackendController.Tests.csproj --configuration Release
-dotnet run --project .\tests\PrivacyBrowser.PaymentLifecycle.Tests\PrivacyBrowser.PaymentLifecycle.Tests.csproj --configuration Release
 .\tests\Test-ProductHardening.ps1
 .\tests\Test-ReleaseMetadata.ps1
 .\tests\Test-Evidence.ps1
-.\validation\Invoke-Validation.ps1 -ModifiedBrowserExe .\vendor\mullvad-browser\mullvadbrowser.exe
 ```
 
-The validation command must run from an elevated prompt because `pktmon`
-capture requires elevation. It writes timestamped evidence under `evidence/`.
-Read `docs/VALIDATION_PLAN.md` before interpreting the result.
+Packet-capture validation is a separate elevated workflow described in
+[docs/VALIDATION_PLAN.md](docs/VALIDATION_PLAN.md).
 
 ## Security boundaries
 
-- This is not Tor and does not provide Tor circuits, relays, onion services,
-  bridges, pluggable transports, or Tor's anonymity properties.
-- The backend's direct discovery, identity, payment, monitoring, and provider
-  negotiation traffic is allowed control-plane traffic.
-- Stripe and PayPal orders remain Mysterium/Pilvytis orders. The app has no
-  merchant keys, Stripe/PayPal SDK, or card/PayPal credential entry surface.
-  USD order options and requests have an application floor of $1.00, with a
-  higher live gateway minimum taking precedence.
-- Hosted checkout URLs stay in native memory, are never logged/persisted/copied,
-  and open only in the default browser after exact field, HTTPS, port, fragment,
-  user-info, and production-host validation. PayPal is further restricted to
-  the documented `/checkoutnow` production path.
-- The Mysterium provider must be selected and connected before browsing.
-- The launcher rejects non-loopback proxy settings and unexpected owners of
-  port 4449.
-- Password controls are cleared immediately after use; passphrases are never
-  persisted or written to activity/startup logs.
-- Only a public identity address is persisted as the user's explicit selection.
-- The native app binds no UI listener and never starts the legacy port 44051
-  web server.
-- The remaining port 44050 is the Myst daemon's existing loopback-only control
-  API. It is explicitly accessed without the Windows/system HTTP proxy.
-- A malicious or compromised backend remains inside the trust boundary.
+- Tower Browser is not Tor and does not provide Tor circuits, relays, bridges,
+  onion services, or Tor anonymity properties.
+- HTTP CONNECT exposes destination hostnames to the local Myst backend.
+- The local Myst control API is unauthenticated loopback HTTP and remains in the
+  application trust boundary.
+- Stripe, PayPal, and CoinGate orders are Mysterium/Pilvytis orders. Tower
+  Browser has no merchant keys or credential-entry surface. No production
+  payment success is claimed.
+- Hosted checkout targets fail closed to documented HTTPS host/path contracts;
+  checkout URLs and credentials are not persisted by the app.
+- The portable build is not Authenticode-signed.
+
+Report vulnerabilities according to [SECURITY.md](SECURITY.md). Do not include
+sensitive vulnerability details in a public issue.
+
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. General
+usage questions and reproducible non-sensitive defects may use GitHub Issues;
+the support boundaries are in [SUPPORT.md](SUPPORT.md).
+
+## Compatibility identifiers
+
+The canonical current product and executable names are **Tower Browser** and
+`TowerBrowser.exe`. The internal `PrivacyBrowser.App` namespace, source/test
+project paths, the single-instance mutex, legacy environment-variable fallback,
+and compatibility launcher are intentionally retained in 1.0.10 to avoid a
+high-risk namespace/storage migration. Historical v1.0.0-v1.0.9 release assets,
+source-offer records, tags, and external links retain their original published
+names.
